@@ -18,6 +18,7 @@
 
 | 문서 | 내용 |
 | --- | --- |
+| [아키텍처와 재구현 순서](architecture.md) | PTY 입력 소유권, 편집기·히스토리·완성·스키마 계약과 직접 만드는 순서 |
 | [자동 완성 구현 이력](completion-plan.md) | 최초 Tab 완성의 체크리스트와 당시 검증 기록 |
 | [초기 언어 도구 검토 기록](language-tools/README.md) | 명세, 인터페이스 계약, 파서 실험, 구현 티켓 목차 |
 | [README 화면 자료](../assets/readme/README.md) | 캡처 출처와 재생성 방법 |

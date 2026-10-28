@@ -19,6 +19,7 @@ Commands, options, diagnostic codes, and SQL examples remain consistent across l
 
 | Document | Contents |
 | --- | --- |
+| [Architecture and reconstruction order](architecture.en.md) | PTY input ownership, editor/history/completion/schema contracts, and implementation order |
 | [Completion implementation history](completion-plan.en.md) | Initial Tab completion checklist and historical verification |
 | [Initial language-tool planning archive](language-tools/README.en.md) | Specification, contracts, parser experiment, and implementation tickets |
 | [README visuals](../assets/readme/README.en.md) | Capture provenance and regeneration |
