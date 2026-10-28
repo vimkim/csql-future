@@ -40,7 +40,7 @@ Direct `csql` remains available through the active CUBRID environment.
 `daily-update-cubrid` registers `~/gh/csql-with-history` and runs `just sync`
 after its guarded fetch and fast-forward. It requires an independent clean
 checkout on `main` tracking `origin/main` from `vimkim/csql-with-history`.
-Until this new repository is published, use `just sync` directly.
+Use `daily-update-cubrid --dry-run ~/gh/csql-with-history` to preview an update.
 
 The accepted wrapper options are:
 
