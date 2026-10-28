@@ -36,7 +36,7 @@ from pty_test_support import AnsiScreen, TerminalSession, wait_for_process_exit
 from verify_real_csql import isolate_runtime, require_program
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = Path(os.environ.get("CSQL_WITH_HISTORY_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-with-history")))
+WRAPPER = Path(os.environ.get("CSQL_FUTURE_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-future")))
 
 
 class CatalogInterruptObservation(NamedTuple):
@@ -65,12 +65,12 @@ class Session(TerminalSession):
   def submit(self, text: str, expected: str, timeout: float = 15.0) -> None:
     self.send(text.encode("utf-8") + b"\r")
     self.expect(expected, timeout)
-    self.expect("csql-with-history>")
+    self.expect("csql-future>")
 
   def submit_to_prompt(self, text: str, timeout: float = 15.0) -> None:
     self.send(text.encode("utf-8") + b"\r")
     self.expect_csql_echo(text, timeout)
-    self.expect("csql-with-history>", timeout)
+    self.expect("csql-future>", timeout)
 
   def expect_csql_echo(self, text: str, timeout: float = 15.0) -> None:
     expected = text.encode("utf-8") + b"\r"
@@ -101,7 +101,7 @@ class Session(TerminalSession):
 
   def assert_editor_screen(self, expected_output: str) -> None:
     lines = self.update_screen()
-    if sum("csql-with-history>" in line for line in lines) != 1:
+    if sum("csql-future>" in line for line in lines) != 1:
       raise AssertionError("expected one rendered wrapper prompt: {}".format(lines))
     if sum("Input mode" in line for line in lines) != 1:
       raise AssertionError("expected one rendered status bar: {}".format(lines))
@@ -112,13 +112,13 @@ class Session(TerminalSession):
 def check_session(label: str, mode: str, database: str, environment: dict[str, str], cwd: Path) -> None:
   session = Session([mode, "-u", "dba", "--no-pager", database], environment, cwd)
   try:
-    session.expect("csql-with-history>")
+    session.expect("csql-future>")
     long_draft = "select '" + "한글" * 40 + "';"
     session.send(long_draft.encode("utf-8"))
     session.read_for(0.2)
     session.set_size(14, 47)
     resized = session.read_for(0.3)
-    if b"csql-with-history>" not in resized or "한글".encode("utf-8") not in resized:
+    if b"csql-future>" not in resized or "한글".encode("utf-8") not in resized:
       raise AssertionError("enhanced editor did not redraw the multibyte draft after resize")
     session.send(b"\x03")
     session.set_size(30, 100)
@@ -131,7 +131,7 @@ def check_session(label: str, mode: str, database: str, environment: dict[str, s
 
     session.send(b"select\x0a424244;\r")
     session.expect("1 row selected")
-    session.expect("csql-with-history>")
+    session.expect("csql-future>")
 
     session.submit(";singleline off", "SINGLELINE IS OFF")
     session.send(b"select\r")
@@ -151,10 +151,10 @@ def check_session(label: str, mode: str, database: str, environment: dict[str, s
     session.send(b"select sleep(1);\r")
     session.read_for(0.3)
     running_lines = session.update_screen()
-    if any("csql-with-history>" in line or "Input mode" in line for line in running_lines):
+    if any("csql-future>" in line or "Input mode" in line for line in running_lines):
       raise AssertionError("quiet running work returned to the wrapper editor early: {}".format(running_lines))
     session.expect("1 row selected", timeout=5.0)
-    session.expect("csql-with-history>")
+    session.expect("csql-future>")
     session.assert_editor_screen("1 row selected")
     if session.finish() != 0:
       raise AssertionError("{} session returned a nonzero status".format(label))
@@ -231,7 +231,7 @@ def check_password_handoff(database: str, environment: dict[str, str], cwd: Path
     session.expect("Password")
     session.diagnostic_redactions.append(password)
     session.send(password.encode("utf-8") + b"\r")
-    session.expect("csql-with-history>")
+    session.expect("csql-future>")
     if password.encode("utf-8") in bytes(session.output):
       raise AssertionError("password input was echoed into the terminal transcript")
     session.submit("select 907001;", "1 row selected")
@@ -275,7 +275,7 @@ def check_terminal_program_handoffs(database: str, environment: dict[str, str], 
     cwd,
   )
   try:
-    session.expect("csql-with-history>")
+    session.expect("csql-future>")
     session.submit_to_prompt(";pager_cmd {} -R".format(less))
     pager_query = "select 'ticket07-pager-row-' || rownum from db_class a, db_class b limit 100;"
     session.send(pager_query.encode("utf-8") + b"\r")
@@ -287,7 +287,7 @@ def check_terminal_program_handoffs(database: str, environment: dict[str, str], 
     session.send(b"987654g")
     session.read_for(0.1)
     session.send(b"q")
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     session.submit_to_prompt(";pager_cmd cat")
 
     session.submit(";singleline off", "SINGLELINE IS OFF")
@@ -306,7 +306,7 @@ def check_terminal_program_handoffs(database: str, environment: dict[str, str], 
     if b"editor-before-ticket07" not in bytes(session.output):
       raise AssertionError("external editor did not receive csql's command buffer")
     session.send(b"\x1b:%s/editor-before-ticket07/editor-external-ticket07/\r:wq\r")
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     session.submit(";xrun", "editor-external-ticket07")
 
     session.submit_to_prompt(";shell_cmd {}".format(shell))
@@ -324,7 +324,7 @@ def check_terminal_program_handoffs(database: str, environment: dict[str, str], 
     session.expect("shell-external-ticket07", timeout=20)
     if time.monotonic() - interrupted_at >= 3.0:
       raise AssertionError("shell interrupt was not delivered through the terminal handoff")
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     session.reset_screen(17, 61)
 
     missing = cwd / "program-does-not-exist"
@@ -333,15 +333,15 @@ def check_terminal_program_handoffs(database: str, environment: dict[str, str], 
     session.submit_to_prompt(";editor_cmd {}".format(missing))
     session.send(b";edit\r")
     session.expect_csql_echo(";edit", timeout=20)
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     session.submit_to_prompt(";pager_cmd {}".format(missing))
     session.send(b"select 907002;\r")
     session.expect_csql_echo("select 907002;", timeout=20)
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     session.submit_to_prompt(";shell_cmd {}".format(missing))
     session.send(b";shell\r")
     session.expect_csql_echo(";shell", timeout=20)
-    session.expect("csql-with-history>", timeout=20)
+    session.expect("csql-future>", timeout=20)
     lowered_output = bytes(session.output).lower()
     if b"not found" not in lowered_output and b"no such file" not in lowered_output:
       raise AssertionError("missing terminal programs produced no observable diagnostic")
@@ -436,8 +436,8 @@ def check_default_shell_against_direct_csql(
     cwd,
   )
   try:
-    wrapped.expect("csql-with-history>")
-    wrapped_reports = drive_default_shell(wrapped, b"csql-with-history>")
+    wrapped.expect("csql-future>")
+    wrapped_reports = drive_default_shell(wrapped, b"csql-future>")
     if direct_reports != wrapped_reports:
       raise AssertionError(
         "default shell cursor-report behavior differs: direct={} wrapped={}".format(
@@ -494,7 +494,7 @@ def check_running_interrupt_against_direct_csql(
   durations = {}
   for label, prompt in (
     ("direct", b"DIRECT_INTERRUPT_TICKET08> "),
-    ("wrapped", b"csql-with-history>"),
+    ("wrapped", b"csql-future>"),
   ):
     if label == "direct":
       session = TerminalSession(
@@ -565,7 +565,7 @@ def check_signal_cleanup_against_direct_csql(
     cwd,
   )
   try:
-    wrapped.expect("csql-with-history>")
+    wrapped.expect("csql-future>")
     children_file = Path(
       "/proc/{}/task/{}/children".format(wrapped.process_id, wrapped.process_id)
     )
@@ -664,7 +664,7 @@ def check_catalog_interrupt_phase_against_direct_csql(
       environment,
       cwd,
     ),
-    b"csql-with-history>",
+    b"csql-future>",
   )
   if wrapped != direct:
     raise AssertionError(
@@ -686,18 +686,18 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
 
   writer = Session(arguments, environment, cwd)
   try:
-    writer.expect("csql-with-history>")
+    writer.expect("csql-future>")
     writer.submit(";singleline off", "SINGLELINE IS OFF")
     for fragment in ("select", "42;"):
       writer.send(fragment.encode("utf-8") + b"\r")
       writer.expect(fragment + "\r")
-      writer.expect("csql-with-history>")
+      writer.expect("csql-future>")
     writer.submit(";xrun", "1 row selected")
     writer.submit(";singleline on", "SINGLELINE IS ON")
     writer.submit("select no_such_ticket03_column;", "ERROR:")
     writer.send(b"select\x0a246810;\r")
     writer.expect("1 row selected")
-    writer.expect("csql-with-history>")
+    writer.expect("csql-future>")
     writer.submit(" select 112233;", "1 row selected")
     writer.send(b"\x04")
     if writer.wait(10) != 0:
@@ -720,7 +720,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
 
   reader = Session(arguments, environment, cwd)
   try:
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
     reader.send(b"\x1b[A")
     recalled = reader.read_for(0.3)
     if b"select" not in recalled or b"246810;" not in recalled:
@@ -729,13 +729,13 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
       raise AssertionError("recall executed without a later submission")
     reader.send(b"\x1b[F 1 +\r")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
 
     reader.send(b"select 97531;")
     reader.read_for(0.1)
     reader.send(b"\x1b[A\x1b[B\x1b[B\r")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
 
     reader.send(b"unfinished\x12246810\r")
     recalled = reader.read_for(0.2)
@@ -743,7 +743,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
       raise AssertionError("history search executed a multiline match during recall")
     reader.send(b"\x1b[A\x1b[F 1 +\r")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
 
     reader.send(b"select 13579;\x12no_such_ticket03")
     reader.read_for(0.1)
@@ -752,7 +752,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
     reader.send(b"\r")
     reader.expect("13579")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
 
     reader.send(b"select 97532;\x12definitely_missing_history_term\r")
     no_match = reader.read_for(0.2)
@@ -765,7 +765,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
     reader.send(b"\r")
     reader.expect("97532")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
 
     reader.submit("select 55551;", "1 row selected")
     reader.submit("select 55552;", "1 row selected")
@@ -787,7 +787,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
     reader.send(b"\r")
     reader.expect("55552")
     reader.expect("1 row selected")
-    reader.expect("csql-with-history>")
+    reader.expect("csql-future>")
     reader.send(b"\x04")
     if reader.wait(10) != 0:
       raise AssertionError("history reader returned a nonzero status")
@@ -797,14 +797,14 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
   before_private = stored_commands(history_file)
   private = Session(["--no-history", *arguments], environment, cwd)
   try:
-    private.expect("csql-with-history>")
+    private.expect("csql-future>")
     private.send(b"\x1b[A")
     private.read_for(0.2)
     if "select 55552;" not in "\n".join(private.update_screen()):
       raise AssertionError("--no-history did not allow read-only recall")
     private.send(b"\r")
     private.expect("1 row selected")
-    private.expect("csql-with-history>")
+    private.expect("csql-future>")
     private.submit("select 86420;", "1 row selected")
     private.send(b"\x04")
     if private.wait(10) != 0:
@@ -832,8 +832,8 @@ def check_shared_history(
   first = Session([*common, first_database], environment, first_directory)
   second = Session([*common, second_database], environment, second_directory)
   try:
-    first.expect("csql-with-history>")
-    second.expect("csql-with-history>")
+    first.expect("csql-future>")
+    second.expect("csql-future>")
 
     first.submit("select 701001;", "1 row selected")
     second.send(b"\x1b[A")
@@ -896,7 +896,7 @@ def check_memory_only_history(database: str, environment: dict[str, str], cwd: P
   )
   try:
     unavailable.expect("newly retained entries will disappear on exit")
-    unavailable.expect("csql-with-history>")
+    unavailable.expect("csql-future>")
     unavailable.submit("select 801001;", "1 row selected")
     unavailable.send(b"\x1b[A")
     unavailable.read_for(0.2)
@@ -919,7 +919,7 @@ def check_memory_only_history(database: str, environment: dict[str, str], cwd: P
   )
   try:
     disabled.expect("history saving remains disabled")
-    disabled.expect("csql-with-history>")
+    disabled.expect("csql-future>")
     disabled.submit("select 801002;", "1 row selected")
     disabled.send(b"\x12801002")
     disabled.read_for(0.2)
@@ -938,7 +938,7 @@ def check_memory_only_history(database: str, environment: dict[str, str], cwd: P
   arguments = ["--history-file", str(history_file), "-S", "-u", "dba", "--no-pager", database]
   failed_writer = Session(arguments, environment, cwd)
   try:
-    failed_writer.expect("csql-with-history>")
+    failed_writer.expect("csql-future>")
     failed_writer.submit("select 802001;", "1 row selected")
     with closing(sqlite3.connect(history_file)) as blocker:
       blocker.execute("BEGIN IMMEDIATE")
@@ -946,7 +946,7 @@ def check_memory_only_history(database: str, environment: dict[str, str], cwd: P
       failed_writer.send(b"select 802002;\r")
       failed_writer.expect("newly retained entries will disappear on exit", timeout=3.0)
       failed_writer.expect("1 row selected")
-      failed_writer.expect("csql-with-history>")
+      failed_writer.expect("csql-future>")
       elapsed = time.monotonic() - started
       blocker.rollback()
     if elapsed < 0.2 or elapsed >= 1.5:
@@ -970,7 +970,7 @@ def check_memory_only_history(database: str, environment: dict[str, str], cwd: P
     raise AssertionError("memory-only submissions were retried or backfilled")
   restarted = Session(arguments, environment, cwd)
   try:
-    restarted.expect("csql-with-history>")
+    restarted.expect("csql-future>")
     restarted.send(b"\x1b[A")
     restarted.read_for(0.2)
     screen = "\n".join(restarted.update_screen())
@@ -1010,7 +1010,7 @@ def main() -> int:
   cubrid = require_program("cubrid")
   require_program("csql")
 
-  with tempfile.TemporaryDirectory(prefix="csql-with-history-editable-") as temporary:
+  with tempfile.TemporaryDirectory(prefix="csql-future-editable-") as temporary:
     root = Path(temporary)
     registry = root / "registry"
     run_directory = root / "run"

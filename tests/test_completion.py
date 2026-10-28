@@ -2,7 +2,7 @@
 
 import unittest
 
-from csql_with_history.completion import CompletionMenu, Relation, Schema, suggest
+from csql_future.completion import CompletionMenu, Relation, Schema, suggest
 
 
 SCHEMA = Schema('DBA', (

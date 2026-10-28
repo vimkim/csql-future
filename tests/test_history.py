@@ -24,7 +24,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from csql_with_history.cli import HistoryMode, SubmissionHistory, format_history_age
+from csql_future.cli import HistoryMode, SubmissionHistory, format_history_age
 
 
 class SubmissionHistoryTest(unittest.TestCase):
@@ -55,7 +55,7 @@ class SubmissionHistoryTest(unittest.TestCase):
     self.make_legacy_history()
     history = self.open_history()
     self.assertIsNone(history.records()[0].submitted_at)
-    with patch("csql_with_history.cli.time.time", return_value=1234567890):
+    with patch("csql_future.cli.time.time", return_value=1234567890):
       history.save("select new;")
     self.assertEqual(["select new;", "select legacy;"], history.entries())
     history.close()
@@ -123,9 +123,9 @@ class SubmissionHistoryTest(unittest.TestCase):
   def test_shared_history_deduplicates_using_the_latest_submission_time(self) -> None:
     first = self.open_history()
     second = self.open_history()
-    with patch("csql_with_history.cli.time.time", return_value=1000):
+    with patch("csql_future.cli.time.time", return_value=1000):
       first.save("select\n'one';")
-    with patch("csql_with_history.cli.time.time", return_value=2000):
+    with patch("csql_future.cli.time.time", return_value=2000):
       second.save("select two;")
       second.save("select\n'one';")
     entries = first.records()
@@ -136,7 +136,7 @@ class SubmissionHistoryTest(unittest.TestCase):
   def test_repeated_saves_update_latest_use_without_evicting_distinct_commands(self) -> None:
     history = self.open_history(limit=3)
     for submitted_at, command in enumerate(("first", "repeat", "middle", "repeat")):
-      with patch("csql_with_history.cli.time.time", return_value=submitted_at):
+      with patch("csql_future.cli.time.time", return_value=submitted_at):
         history.save(command)
     self.assertEqual([("first", 0), ("middle", 2), ("repeat", 3)], self.stored_entries())
     self.assertEqual(["repeat", "middle", "first"], history.entries())
@@ -170,7 +170,7 @@ class SubmissionHistoryTest(unittest.TestCase):
 
   def test_failed_insert_rolls_back_duplicate_removal(self) -> None:
     history = self.open_history()
-    with patch("csql_with_history.cli.time.time", return_value=1000):
+    with patch("csql_future.cli.time.time", return_value=1000):
       history.save("repeat")
     with closing(sqlite3.connect(self.path)) as connection:
       connection.execute(
@@ -178,7 +178,7 @@ class SubmissionHistoryTest(unittest.TestCase):
         "BEGIN SELECT RAISE(ABORT, 'insert failed'); END"
       )
       connection.commit()
-    with patch("csql_with_history.cli.time.time", return_value=2000):
+    with patch("csql_future.cli.time.time", return_value=2000):
       history.save("repeat")
     self.assertIs(history.mode, HistoryMode.MEMORY_ONLY)
     self.assertEqual([("repeat", 1000)], self.stored_entries())
@@ -207,7 +207,7 @@ class SubmissionHistoryTest(unittest.TestCase):
   def test_unavailable_store_keeps_memory_only_submission_times(self) -> None:
     self.path.mkdir()
     history = self.open_history()
-    with patch("csql_with_history.cli.time.time", return_value=1000):
+    with patch("csql_future.cli.time.time", return_value=1000):
       history.save("select volatile;")
     self.assertEqual(1000, history.records()[0].submitted_at)
 

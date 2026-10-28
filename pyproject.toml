@@ -3,9 +3,9 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "csql-with-history"
+name = "csql-future"
 version = "0.1.0"
-description = "Editable CUBRID csql sessions with persistent searchable history."
+description = "A CUBRID SQL shell with searchable history and schema-aware completion."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 dependencies = []
 
 [project.scripts]
-csql-with-history = "csql_with_history.cli:main"
+csql-future = "csql_future.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/csql_with_history"]
+packages = ["src/csql_future"]

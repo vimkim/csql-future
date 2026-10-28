@@ -29,7 +29,7 @@ import tempfile
 from typing import List, Optional, Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = Path(os.environ.get("CSQL_WITH_HISTORY_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-with-history")))
+WRAPPER = Path(os.environ.get("CSQL_FUTURE_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-future")))
 ELAPSED_TIME = re.compile(rb"\([0-9]+(?:\.[0-9]+)? sec\)")
 
 
@@ -132,7 +132,7 @@ def main() -> int:
   require_program("csql")
   cubrid = require_program("cubrid")
 
-  with tempfile.TemporaryDirectory(prefix="csql-with-history-bypass-") as temporary:
+  with tempfile.TemporaryDirectory(prefix="csql-future-bypass-") as temporary:
     root = Path(temporary)
     registry = root / "registry"
     database_directory = root / "database"

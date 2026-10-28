@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="414" viewBox="0 0 1200 414" role="img" aria-labelledby="title desc">
+  <title id="title">Search your saved SQL</title>
+  <desc id="desc">Actual editor output: Ctrl+R searches illustrative saved employee queries.</desc>
+  <rect width="1200" height="414" rx="20" fill="#1e1e2e"/>
+  <g font-family="DejaVu Sans Mono, ui-monospace, monospace" font-size="28" xml:space="preserve" style="white-space:pre">
+    <text x="48" y="72" fill="#cba6f7">csql-future&gt;</text>
+    <text x="48" y="114" fill="#cdd6f4">History search:</text>
+    <text x="48" y="156" fill="#cdd6f4">employees</text>
+    <text x="48" y="198" fill="#89b4fa">&gt; select name from employees where id = 42;         (3 min ago)</text>
+    <text x="48" y="240" fill="#cdd6f4">  select department from employees;                 (6 min ago)</text>
+    <text x="48" y="282" fill="#cdd6f4">  select id, name from employees;                   (9 min ago)</text>
+    <text x="48" y="324" fill="#a6adc8"> History search mode | Ctrl+Q quit | Enter recall | Esc back</text>
+  </g>
+</svg>

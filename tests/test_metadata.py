@@ -2,8 +2,8 @@
 
 import unittest
 
-from csql_with_history.cli import completion_connection
-from csql_with_history.metadata import HEADER, parse_catalog
+from csql_future.cli import completion_connection
+from csql_future.metadata import HEADER, parse_catalog
 
 
 class MetadataTest(unittest.TestCase):

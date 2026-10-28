@@ -5,7 +5,7 @@ default:
 # Install or refresh an independent user-level command.
 sync:
     uv tool install --reinstall .
-    @"$(uv tool dir --bin)/csql-with-history" --version
+    @"$(uv tool dir --bin)/csql-future" --version
 
 # Verify the packaged launcher through external processes and pseudo-terminals.
 test:

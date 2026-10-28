@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""External-process tests for the csql-with-history bypass."""
+"""External-process tests for the csql-future bypass."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ import textwrap
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = Path(os.environ.get("CSQL_WITH_HISTORY_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-with-history")))
+WRAPPER = Path(os.environ.get("CSQL_FUTURE_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-future")))
 
 
 class LaunchAndBypassTest(unittest.TestCase):
@@ -192,7 +192,7 @@ class LaunchAndBypassTest(unittest.TestCase):
 
   def test_help_and_version_work_without_csql_on_path(self) -> None:
     environment = dict(self.environment, PATH=str(self.root / "missing"))
-    for option, expected in (("--help", b"--history-file"), ("--version", b"csql-with-history 0.1.0")):
+    for option, expected in (("--help", b"--history-file"), ("--version", b"csql-future 0.1.0")):
       with self.subTest(option=option):
         result = subprocess.run(
           [str(WRAPPER), option], cwd=self.root, env=environment, capture_output=True, check=False,
@@ -212,7 +212,7 @@ class LaunchAndBypassTest(unittest.TestCase):
   def test_active_path_client_wins_over_a_launcher_sibling(self) -> None:
     launchers = self.root / "launchers"
     launchers.mkdir()
-    launcher = launchers / "csql-with-history"
+    launcher = launchers / "csql-future"
     launcher.write_bytes(WRAPPER.read_bytes())
     launcher.chmod(0o755)
     sibling = launchers / "csql"

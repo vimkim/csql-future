@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="310" viewBox="0 0 1200 310" role="img" aria-labelledby="title desc">
+  <title id="title">csql-future</title>
+  <desc id="desc">Searchable history and schema-aware completion for the CUBRID SQL client.</desc>
+  <rect width="1200" height="310" rx="20" fill="#1e1e2e"/>
+  <g id="project-title" font-family="DejaVu Sans Mono, ui-monospace, monospace">
+    <text x="64" y="67" font-size="22" fill="#a6adc8" letter-spacing="3">CUBRID / INTERACTIVE SQL</text>
+    <text x="60" y="173" font-size="88" font-weight="700" fill="#cba6f7">&gt;</text>
+    <text x="143" y="173" font-size="88" font-weight="700" fill="#cdd6f4">csql-future</text>
+    <path d="M792 191 H843" stroke="#89b4fa" stroke-width="7"/>
+  </g>
+  <g id="project-value" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="34" fill="#cdd6f4">
+    <text x="64" y="253">Searchable history.</text>
+    <text x="458" y="253" fill="#89b4fa">Schema-aware completion.</text>
+  </g>
+</svg>

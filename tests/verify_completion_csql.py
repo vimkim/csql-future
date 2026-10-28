@@ -9,14 +9,14 @@ import tempfile
 
 from verify_editable_csql import Session, checked_run
 from verify_real_csql import isolate_runtime, require_program
-from csql_with_history.metadata import CATALOG_QUERY, parse_catalog
+from csql_future.metadata import CATALOG_QUERY, parse_catalog
 
 
 def check_completion(mode: str, database: str, environment: dict[str, str], root: Path) -> None:
   history = root / ('history-' + mode + '.sqlite3')
   session = Session(['--history-file', str(history), mode, '-u', 'dba', '--no-pager', database], environment, root)
   try:
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     session.send(b'select * from co\t')
     session.expect('> code  table DBA')
     session.expect('coding  table DBA')
@@ -26,12 +26,12 @@ def check_completion(mode: str, database: str, environment: dict[str, str], root
       assert connection.execute('SELECT count(*) FROM submissions').fetchone()[0] == 0
     session.send(b';\r')
     session.expect('1 row selected')
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     session.send(b'select * from code c where c.na\t')
     session.expect('name  column c')
     session.send(b"\r='code-row';\r")
     session.expect('1 row selected')
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     assert session.finish() == 0
     with closing(sqlite3.connect(history)) as connection:
       commands = [row[0] for row in connection.execute('SELECT command FROM submissions ORDER BY id')]
@@ -52,7 +52,7 @@ def check_show_completion(mode: str, database: str, environment: dict[str, str],
   )
   commands = []
   try:
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     for keys, menu, command in cases:
       session.send(keys)
       session.expect(menu)
@@ -62,7 +62,7 @@ def check_show_completion(mode: str, database: str, environment: dict[str, str],
         assert connection.execute('SELECT count(*) FROM submissions').fetchone()[0] == len(commands)
       session.send(b'\r')
       session.expect('2 rows selected')
-      session.expect('csql-with-history>')
+      session.expect('csql-future>')
       commands.append(command)
     assert session.finish() == 0
     with closing(sqlite3.connect(history)) as connection:
@@ -129,7 +129,7 @@ def server_command(cubrid: str, action: str, database: str, environment: dict[st
 def check_refresh(database: str, environment: dict[str, str], root: Path) -> None:
   session = Session(['-C', '-u', 'dba', '--no-pager', database], environment, root)
   try:
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     session.send(b'select * from co\t')
     session.expect('> code  table DBA')
     session.send(b'\x1b')
@@ -146,7 +146,7 @@ def check_refresh(database: str, environment: dict[str, str], root: Path) -> Non
     session.expect('> coder  table DBA')
     session.send(b'\r;\r')
     session.expect('0 row selected')
-    session.expect('csql-with-history>')
+    session.expect('csql-future>')
     assert session.finish() == 0
     print('PASS real client/server refresh discovers committed DDL', flush=True)
   finally:

@@ -277,7 +277,7 @@ class SubmissionHistory:
       self.connection = None
     if self.mode is HistoryMode.SAVE_DISABLED:
       print(
-        "csql-with-history: warning: persistent history unavailable ({}); "
+        "csql-future: warning: persistent history unavailable ({}); "
         "history saving remains disabled".format(error),
         file=sys.stderr,
         flush=True,
@@ -285,7 +285,7 @@ class SubmissionHistory:
       return
     self.mode = HistoryMode.MEMORY_ONLY
     print(
-      "csql-with-history: warning: persistent history unavailable ({}); "
+      "csql-future: warning: persistent history unavailable ({}); "
       "using memory-only history; newly retained entries will disappear on exit".format(error),
       file=sys.stderr,
       flush=True,
@@ -672,7 +672,7 @@ class DraftEditor:
         path.write_text(self.draft.text + "\n", encoding="utf-8")
         returncode = run_terminal_editor([*command, str(path)])
         if returncode:
-          print("csql-with-history: editor exited with status {}; draft kept".format(returncode),
+          print("csql-future: editor exited with status {}; draft kept".format(returncode),
                 file=sys.stderr, flush=True)
           return
         text = path.read_text(encoding="utf-8").removesuffix("\n")
@@ -681,7 +681,7 @@ class DraftEditor:
           self.draft.cursor = len(text)
           self.history_index = None
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-      print("csql-with-history: cannot edit draft ({}); draft kept".format(error),
+      print("csql-future: cannot edit draft ({}); draft kept".format(error),
             file=sys.stderr, flush=True)
     finally:
       tty.setraw(0)
@@ -849,7 +849,7 @@ class DraftEditor:
     terminal_size = os.get_terminal_size(0)
     columns = max(2, terminal_size.columns)
     content_width = columns - 1
-    prompt = self._truncate("csql-with-history>", max(0, content_width - 1))
+    prompt = self._truncate("csql-future>", max(0, content_width - 1))
     prefix = prompt + " "
     prefix_width = len(prefix)
 
@@ -1186,7 +1186,7 @@ class CsqlTerminal:
     arguments: Sequence[str],
     child_signal_mask: set[signal.Signals],
   ) -> None:
-    self.prompt_base = "__CSQL_WITH_HISTORY_{}__".format(uuid.uuid4().hex)
+    self.prompt_base = "__CSQL_FUTURE_{}__".format(uuid.uuid4().hex)
     self.prompt = (self.prompt_base + "> ").encode("ascii")
     self.pending = bytearray()
     self.prompt_candidate_since: Optional[float] = None
@@ -1621,9 +1621,9 @@ def main(arguments: Optional[Sequence[str]] = None) -> int:
   if arguments is None:
     arguments = sys.argv[1:]
   if list(arguments) == ["--help"]:
-    print("""Usage: csql-with-history [WRAPPER OPTIONS] [CSQL OPTIONS] DATABASE
+    print("""Usage: csql-future [WRAPPER OPTIONS] [CSQL OPTIONS] DATABASE
 
-Editable multiline input with persistent searchable history for CUBRID csql.
+Searchable history, schema-aware completion, and multiline editing for CUBRID csql.
 Uses the csql executable selected by PATH in your active CUBRID environment.
 
 Wrapper options:
@@ -1645,18 +1645,18 @@ Other arguments pass through to csql. Run csql directly for its native usage."""
     return 0
   if list(arguments) == ["--version"]:
     from importlib.metadata import version
-    print("csql-with-history " + version("csql-with-history"))
+    print("csql-future " + version("csql-future"))
     return 0
   launch_directory = Path.cwd()
   try:
     options, csql_arguments = parse_options(arguments, launch_directory)
   except OptionError as error:
-    print("csql-with-history: {}".format(error), file=sys.stderr)
+    print("csql-future: {}".format(error), file=sys.stderr)
     return 2
 
   executable = find_csql()
   if executable is None:
-    print("csql-with-history: installed csql executable not found", file=sys.stderr)
+    print("csql-future: installed csql executable not found", file=sys.stderr)
     return 127
 
   if is_interactive(csql_arguments):
@@ -1665,7 +1665,7 @@ Other arguments pass through to csql. Run csql directly for its native usage."""
   try:
     os.execv(executable, ["csql", *csql_arguments])
   except OSError as error:
-    print("csql-with-history: cannot execute csql: {}".format(error), file=sys.stderr)
+    print("csql-future: cannot execute csql: {}".format(error), file=sys.stderr)
     return 126
   return 126
 

@@ -1,6 +1,6 @@
 /.venv/
 /dist/
-/src/csql_with_history/__pycache__/
+/src/csql_future/__pycache__/
 /tests/__pycache__/
 /.csql_history.sqlite3
 /.csql_history.sqlite3-wal

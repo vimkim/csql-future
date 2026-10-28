@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
+  <title id="title">Complete names from your schema</title>
+  <desc id="desc">Actual editor output: e. offers department, id, and name from an illustrative employees catalog.</desc>
+  <rect width="1200" height="330" rx="20" fill="#1e1e2e"/>
+  <g font-family="DejaVu Sans Mono, ui-monospace, monospace" font-size="28" xml:space="preserve" style="white-space:pre">
+    <text x="48" y="72" fill="#cba6f7">csql-future&gt; select e. from employees e;</text>
+    <text x="48" y="114" fill="#89b4fa">&gt; department  column e</text>
+    <text x="48" y="156" fill="#cdd6f4">  id  column e</text>
+    <text x="48" y="198" fill="#cdd6f4">  name  column e</text>
+    <text x="48" y="240" fill="#cdd6f4"> Completion | Ctrl+N/P select | Enter accepts | Esc cancels</text>
+  </g>
+</svg>
