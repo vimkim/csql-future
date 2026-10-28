@@ -55,3 +55,39 @@ DB를 만들거나 서버를 관리하지 않습니다. 이 디렉터리의 `dem
 ```bash
 asciinema play assets/readme/demodb-demo.cast
 ```
+
+<a id="live-history-recording"></a>
+
+## 실제 히스토리 녹화
+
+`history-demo.gif`는 실제 `demodb` 독립 모드에서 Ctrl+R 검색과 히스토리 탐색을
+보여 주는 별도 녹화입니다. `history-demo.cast`에 터미널 출력을 보관합니다.
+자동 완성 영상과 같은 색상·터미널 크기·글꼴·녹화 환경을 사용합니다.
+`history.svg`도 정적 예시로 남아 있습니다.
+
+다음 쿼리를 실제로 실행해 새 히스토리를 만듭니다.
+
+```sql
+select name from athlete limit 3;
+select code from athlete limit 3;
+```
+
+Ctrl+R을 누르고 `athlete`를 입력한 뒤 아래 방향키로 먼저 실행한 `name` 쿼리를
+선택합니다. Enter로 편집기에 불러온 상태에서 잠시 멈추고, Enter를 다시 눌러
+실행한 뒤 `;exit`로 종료합니다. 임시 디렉터리에서 이 세션이 만든 히스토리만
+사용하며 개인 히스토리는 읽지 않습니다.
+
+자동 완성 영상과 같은 환경을 준비한 뒤 저장소 루트에서 재생성합니다.
+
+```bash
+python3 tools/record_history_demo.py
+```
+
+스크립트는 두 쿼리가 히스토리에 보이는지, 불러오기만으로 SQL이 실행되지 않는지,
+총 세 번의 쿼리 실행이 성공하는지 확인합니다. `history-demo.cast`와
+`history-demo.gif`만 기록하며 자동 완성 녹화는 변경하지 않습니다.
+별도 경로에서 확인하려면 `--output-dir /tmp/csql-history-demo`를 사용합니다.
+
+```bash
+asciinema play assets/readme/history-demo.cast
+```

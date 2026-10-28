@@ -40,8 +40,13 @@
 오타 보정이나 검색어 내부의 글자를 건너뛰는 매칭은 지원하지 않습니다.
 
 <p align="center">
-  <img src="assets/readme/history.svg" width="100%" alt="Ctrl+R 히스토리 검색: employees 관련 쿼리를 좁혀 선택한 뒤 Enter로 편집기에 불러옵니다">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="실제 demodb 히스토리 시연: athlete 쿼리 두 개를 실행하고 Ctrl+R로 검색한 뒤 아래 방향키로 이전 쿼리를 골라 Enter로 불러오고 다시 Enter로 실행합니다">
 </p>
+
+영상은 `select name from athlete limit 3;`과 `select code from athlete limit 3;`을
+실행한 뒤 **Ctrl+R**로 `athlete`를 검색합니다. **아래 방향키**로 먼저 실행한 쿼리를
+고르고 **Enter**로 편집기에 불러온 다음, Enter를 다시 눌러 실행합니다.
+[히스토리 GIF 재생성 방법](assets/readme/README.md#live-history-recording)을 참고하세요.
 
 - **재시작 후에도 유지:** 기본으로 최근 고유 명령 10,000개를 SQLite에 보관합니다.
 - **중복을 줄인 목록:** 완전히 같은 명령은 최신 제출 시각으로 갱신합니다.
@@ -91,7 +96,7 @@ select <cursor> from employees;
 위·아래 키로 후보를 고르고 **Enter**로 삽입합니다.
 목록이 닫힌 뒤 Enter를 다시 눌러야 SQL이 제출됩니다. **Esc**는 현재 초안을 유지합니다.
 
-*정적 화면은 실제 편집기를 테스트용 히스토리와 `employees` 스키마로 실행해 캡처했습니다.
+*정적 자동 완성 화면은 실제 편집기를 테스트용 `employees` 스키마로 실행해 캡처했습니다.
 [캡처 재생성 방법](assets/readme/README.md)을 참고하세요.*
 
 <a id="get-started"></a>

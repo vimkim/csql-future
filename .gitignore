@@ -2,6 +2,7 @@
 /dist/
 /src/csql_future/__pycache__/
 /tests/__pycache__/
+/tools/__pycache__/
 /.csql_history.sqlite3
 /.csql_history.sqlite3-wal
 /.csql_history.sqlite3-shm

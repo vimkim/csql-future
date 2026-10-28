@@ -39,8 +39,13 @@ substring somewhere in the query**. It does not correct typos or skip characters
 within a term.
 
 <p align="center">
-  <img src="assets/readme/history.svg" width="100%" alt="History search: filter employee queries, select a result, and press Enter to recall it for editing">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="Real demodb history demo: run two athlete queries, press Ctrl+R, search for athlete, select the older name query with Down, recall with Enter, then press Enter again to run it">
 </p>
+
+The demo runs `select name from athlete limit 3;` and
+`select code from athlete limit 3;`, then presses **Ctrl+R** and searches for
+`athlete`. **Down** selects the older query; **Enter** recalls it into the editor.
+A second Enter runs it. [Regenerate the history GIF](assets/readme/README.en.md#live-history-recording).
 
 - **Survives restarts:** SQLite retains the latest 10,000 unique commands by default.
 - **Less duplication:** submitting identical text updates its latest submission time.
@@ -89,7 +94,7 @@ Keep typing to filter the open list. Backspace broadens the matches again.
 Use Up/Down to choose a candidate and **Enter** to insert it. SQL is submitted
 after the list closes and you press Enter again. **Esc** keeps your current draft.
 
-*The static captures use the actual editor with illustrative history and an
+*The static completion image uses the actual editor with an illustrative
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.en.md).*
 
 <a id="get-started"></a>

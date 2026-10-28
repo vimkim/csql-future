@@ -57,3 +57,38 @@ To replay the captured session without a database, use:
 ```bash
 asciinema play assets/readme/demodb-demo.cast
 ```
+
+## Live history recording
+
+`history-demo.gif` is a separate recording of Ctrl+R search and history
+navigation against real `demodb` in standalone mode. `history-demo.cast`
+preserves its terminal output. It shares the completion demo's palette,
+terminal dimensions, font, and recording prerequisites. `history.svg` remains
+available as a static illustration.
+
+The recording submits these queries to build fresh history:
+
+```sql
+select name from athlete limit 3;
+select code from athlete limit 3;
+```
+
+It presses Ctrl+R, types `athlete`, and uses Down to select the older `name`
+query. Enter recalls the query into the editor; the recording pauses before
+pressing Enter again to execute it. `;exit` quits. All history comes from this
+session in a temporary directory, without reading personal history.
+
+With the same prerequisites as the completion demo, regenerate from the root:
+
+```bash
+python3 tools/record_history_demo.py
+```
+
+The recorder verifies that both queries appear in history, recall does not
+execute SQL, and exactly three queries succeed. It writes only
+`history-demo.cast` and `history-demo.gif`, leaving the completion recording
+unchanged. Use `--output-dir /tmp/csql-history-demo` for a separate preview.
+
+```bash
+asciinema play assets/readme/history-demo.cast
+```
