@@ -91,11 +91,14 @@ scrolling within it keeps the preview frame and draft in place.
 In Input mode:
 
 - Tab opens completion. Ctrl+N/P, Down/Up, or repeated Tab selects a candidate.
+  Typing, deleting, or moving the cursor refreshes the list for the current draft.
+  The selected candidate stays selected while it still matches. An empty list
+  stays open, so deleting a typo brings matches back.
   Enter accepts it without executing SQL. Esc closes the list without changing
   the draft. Enter submits SQL after the completion list closes.
   Tab in indentation, strings, and comments inserts a literal tab.
   F1 shows completion-specific help while the list is open. Ctrl+X Ctrl+E
-  closes completion and opens the unchanged draft in the external editor.
+  closes completion and opens the current draft in the external editor.
 - Enter submits the entire draft.
 - **Ctrl+X Ctrl+E** opens the current draft in an external terminal editor.
   Press Ctrl+X, then Ctrl+E. The wrapper uses `$VISUAL`, then `$EDITOR`, then

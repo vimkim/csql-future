@@ -461,6 +461,132 @@ finally:
     session.read_until(b'EXECUTED=["SHOW TABLES;"]')
     self.assertEqual(['SHOW TABLES;'], self.stored_commands())
 
+  def test_completion_filters_while_typing_and_recovers_after_backspace(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    session.send(b'select * from co\t')
+    session.read_until(b'> code  table DBA')
+    session.send(b'di')
+    session.read_for(0.1)
+    screen = self.rendered_screen(session)
+    self.assertIn('Completion |', screen)
+    self.assertIn('> coding  table DBA', screen)
+    self.assertNotIn('code  table DBA', screen)
+    self.assertIn('csql-future> select * from codi', screen)
+
+    session.send(b'x')
+    session.read_until(b'(no completions)')
+    session.send(b'\r')
+    session.read_for(0.05)
+    self.assertEqual([], self.stored_commands())
+    self.assertNotIn(b'EXECUTED=', bytes(session.output))
+    session.send(b'\x7f\x7f')
+    session.read_until(b'  code  table DBA')
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn('> coding  table DBA', screen)
+    self.assertNotIn('(no completions)', screen)
+    session.send(b'\r')
+    session.read_for(0.05)
+    self.assertIn('csql-future> select * from coding', self.rendered_screen(session))
+    self.assertEqual([], self.stored_commands())
+    session.send(b';\r')
+    session.read_until(b'EXECUTED=["select * from coding;"]')
+    self.assertEqual(['select * from coding;'], self.stored_commands())
+    self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
+
+  def test_live_completion_replaces_edited_tokens_and_preserves_suffix(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    cases = (
+      ('select * from co|wrong where id=1;', b'di', '> coding  table DBA',
+       'select * from coding where id=1;'),
+      ('select c.n|wrong from code c;', b'a', '> name  column c',
+       'select c.name from code c;'),
+      ('select * from [co|wrong] where id=1;', b'di', '> [coding]  table DBA',
+       'select * from [coding] where id=1;'),
+      ('select /*+ re|wrong */ 42;', b'c', '> RECOMPILE  query hint',
+       'select /*+ RECOMPILE */ 42;'),
+      ("SET SYSTEM PARAMETERS 'lock_t|wrong';", b'i', '> lock_timeout=  parameter msec',
+       "SET SYSTEM PARAMETERS 'lock_timeout=';"),
+      (';pl|wrong', b'a', '> ;plan  query plan', ';plan'),
+    )
+    for marked, typed, candidate, accepted in cases:
+      with self.subTest(draft=marked):
+        draft = marked.replace('|', '')
+        session.send(b'\x03' + draft.encode() + b'\x02' * (len(draft) - marked.index('|')) + b'\t')
+        session.read_until(b'Completion |')
+        session.read_for(0.05)
+        session.send(typed)
+        session.read_for(0.05)
+        self.assertIn(candidate, self.rendered_screen(session))
+        session.send(b'\r')
+        session.read_for(0.05)
+        screen = self.rendered_screen(session)
+        self.assertIn('csql-future> ' + accepted, screen)
+        self.assertNotIn('Completion |', screen)
+        self.assertEqual([], self.stored_commands())
+        self.assertNotIn(b'EXECUTED=', bytes(session.output))
+        session.send(b'\x03')
+        session.read_for(0.05)
+
+  def test_live_completion_tracks_context_cursor_edits_and_cancellation(self) -> None:
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    session.send(b'sh\t')
+    session.read_until(b'> SHOW  keyword')
+    session.send(b'ow ta')
+    session.read_for(0.1)
+    self.assertIn('> TABLES  keyword', self.rendered_screen(session))
+    session.send(b'\x02')
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn('csql-future> show ta', screen)
+    self.assertIn('> TABLES  keyword', screen)
+    self.assertIn('THREADS  keyword', screen)
+    session.send(b'\x1b[3~')
+    session.read_for(0.05)
+    self.assertIn('csql-future> show t', self.rendered_screen(session))
+    session.send(b'\x17')
+    session.read_for(0.05)
+    self.assertIn('KEYS  keyword', self.rendered_screen(session))
+    session.send(b'\x19a')
+    session.read_for(0.05)
+    self.assertIn('> TABLES  keyword', self.rendered_screen(session))
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    screen = self.rendered_screen(session)
+    self.assertIn('csql-future> show ta', screen)
+    self.assertNotIn('Completion |', screen)
+    session.send(b'\t\x03')
+    session.read_for(0.05)
+    self.assertNotIn('Completion |', self.rendered_screen(session))
+    session.send(b"select \t'")
+    session.read_for(0.05)
+    self.assertNotIn('Completion |', self.rendered_screen(session))
+    session.send(b"text';\r")
+    session.read_until(b'EXECUTED=["select \'text\';"]')
+    self.assertEqual(["select 'text';"], self.stored_commands())
+
+  def test_live_completion_uses_the_latest_prefix_when_metadata_arrives(self) -> None:
+    self.enable_catalog()
+    self.environment['SYNTHETIC_CATALOG_DELAY'] = '0.5'
+    session = self.start(['-C'])
+    session.read_until(b'csql-future>')
+    session.send(b'select * from co\t')
+    session.read_until(b'Loading schema')
+    session.send(b'di')
+    session.read_until(b'> coding  table DBA')
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn('csql-future> select * from codi', screen)
+    self.assertNotIn('code  table DBA', screen)
+    session.send(b'\r;\r')
+    session.read_until(b'EXECUTED=["select * from coding;"]')
+    self.assertEqual(['select * from coding;'], self.stored_commands())
+
   def test_hint_completion_preserves_the_comment_and_accepts_without_execution(self) -> None:
     session = self.start(['-S'])
     session.read_until(b'csql-future>')

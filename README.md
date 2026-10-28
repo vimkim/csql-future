@@ -39,8 +39,9 @@ Simple aliases work too, as shown below with `e.`.
   <img src="assets/readme/completion.svg" width="100%" alt="Column completion: select e. from employees e offers department, id, and name from the demo schema">
 </p>
 
+Keep typing to filter the open list; Backspace broadens the matches again.
 Use Up/Down to choose a candidate and **Enter** to insert it. SQL runs only
-after the list closes and you press Enter again. **Esc** keeps the original draft.
+after the list closes and you press Enter again. **Esc** keeps your current draft.
 Completion also guides CSQL `;` commands, inspection and diagnostic SQL,
 parameters, and accessible `db_` / `_db_` catalog names.
 

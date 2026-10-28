@@ -471,6 +471,7 @@ class DraftEditor:
     "?: shortcuts on an empty query; F1: anytime",
   )
   COMPLETION_SHORTCUTS = (
+    "Type or delete text to filter candidates",
     "Select and accept:",
     "Ctrl+N / Down / Tab: select next candidate",
     "Ctrl+P / Up: select previous candidate",
@@ -589,14 +590,15 @@ class DraftEditor:
             self._edit_external(previous)
             self._render(force=True)
             continue
-          elif event.action is not EditorAction.REDRAW:
+          elif event.action is EditorAction.INTERRUPT:
             self.completion.active = False
-            # Editing keys apply to the unchanged draft after closing the menu.
-            if event.action is EditorAction.INTERRUPT:
-              self.draft.text = ""
-              self.draft.cursor = 0
-            else:
-              self.draft.handle(event)
+            self.draft.text = ""
+            self.draft.cursor = 0
+          elif event.action is not EditorAction.REDRAW:
+            before = (self.draft.text, self.draft.cursor)
+            self.draft.handle(event)
+            if (self.draft.text, self.draft.cursor) != before:
+              self._refresh_completion()
           self._render(force=event.action is EditorAction.REDRAW)
           continue
         if self.search.active:
@@ -730,15 +732,24 @@ class DraftEditor:
       self.draft.text = self.unfinished_text
       self.draft.cursor = self.unfinished_cursor
 
+  def _refresh_completion(self) -> None:
+    assert self.catalog is not None
+    candidates = self.completion.suggestions.candidates
+    selected = candidates[self.completion.selected] if candidates else None
+    schema, message, self.catalog_revision = self.catalog.snapshot()
+    suggestions = suggest(self.draft.text, self.draft.cursor, schema, message)
+    self.completion.open(self.draft.text, self.draft.cursor, suggestions)
+    self.completion.active = suggestions.allowed
+    self.completion.selected = next(
+      (index for index, candidate in enumerate(suggestions.candidates) if candidate == selected), 0,
+    )
+
   def _read_key(self) -> KeyEvent:
     while True:
       if self.catalog is not None and self.completion.active:
-        schema, message, revision = self.catalog.snapshot()
+        _, _, revision = self.catalog.snapshot()
         if revision != self.catalog_revision:
-          selected = self.completion.selected
-          self.completion.suggestions = suggest(self.draft.text, self.draft.cursor, schema, message)
-          self.completion.selected = min(selected, max(0, len(self.completion.suggestions.candidates) - 1))
-          self.catalog_revision = revision
+          self._refresh_completion()
           return KeyEvent(EditorAction.REDRAW)
       if self.consume_resize():
         return KeyEvent(EditorAction.REDRAW)
