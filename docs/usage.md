@@ -289,27 +289,64 @@ and comma-separated tables. It respects owner-qualified and quoted identifiers.
 Names that require quoting receive brackets. SQL keywords are also available.
 Reserved-word quoting uses a CUBRID 11.5 keyword snapshot.
 
-`SHOW` completion follows the command syntax. `SHOW ` offers `COLUMNS`, `FULL`,
-and `TABLES`; `SHOW TA` offers `TABLES`. After `SHOW [FULL] COLUMNS `, Tab offers
-`FROM` and `IN`. Both connectors complete cached table/view names, including
-owner-qualified and quoted names, as in `SHOW COLUMNS IN other.[co`.
-These syntax keywords remain available when schema metadata is unavailable.
-This initial scope covers `SHOW [FULL] TABLES` and `SHOW [FULL] COLUMNS` through
-table selection. Other SHOW families and SHOW `LIKE`/`WHERE` filter completion
-are outside this scope. SHOW filters do not suggest the target table's columns.
+`SHOW` completion covers the CUBRID 11.4 inspection and diagnostic families:
+`TABLES`, `COLUMNS`, `INDEX`/`INDEXES`/`KEYS`, `COLLATION`, `TIMEZONES`, `GRANTS`,
+`CREATE TABLE`/`CREATE VIEW`, `ACCESS STATUS`, `EXEC STATISTICS`, volume/log/archive
+headers, heap headers/capacity, slotted pages, index headers/capacity, critical
+sections, transaction tables, threads, job queues, and page-buffer status.
+`DESC`, `DESCRIBE`, and `EXPLAIN` complete table/view names. In CUBRID, these
+commands describe columns; use `;plan` for query plans.
+
+Completion guides each command's keywords, including `FULL`, `ALL`, `FROM`/`IN`,
+`OF`, and the volume/page structure of slotted-page commands. Object arguments
+use cached names: tables for heap inspection, views for `SHOW CREATE VIEW`, users
+for `SHOW GRANTS FOR`, and indexes after `SHOW INDEX HEADER OF table.` or
+`SHOW INDEX CAPACITY OF owner.table.`. Diagnostic keywords identify their DBA
+requirement. Syntax remains available when metadata cannot be loaded.
+
+Where supported, `LIKE` and `WHERE` are offered after the command. `SHOW ... WHERE`
+completes the command's result fields rather than columns of the underlying table.
+For example, `SHOW COLUMNS FROM athlete WHERE fi` offers `Field`, and
+`SHOW THREADS WHERE st` offers `Status`. String contents remain literal, except
+for the parameter assignments described below.
+
+Type `;` and Tab for native session command names and descriptions, plus the
+wrapper's `;refresh-completions`. Common arguments also complete: `;plan` offers
+`simple`, `detail`, and `off`; `;trace` offers `on`/`off` and `text`/`json`;
+`on`/`off` switches, `;schema` and `;info stats` table names, and `;connect` user
+names are supported. Native abbreviations remain usable.
+
+`GET`/`SET` optimization and isolation syntax, `SET TRACE`, `SHOW TRACE`, and
+`UPDATE STATISTICS ON` also complete, including comma-separated tables,
+`ALL CLASSES`, `CATALOG CLASSES`, and `WITH FULLSCAN`.
+
+Parameter completion supports `;get`, `;set`, and quoted assignments in
+`SET SYSTEM PARAMETERS '...'`. Setters offer documented dynamic parameters,
+append `=` when needed, and suggest Boolean values; SQL assignments also offer
+`DEFAULT` where supported. Names, types, DBA requirements, and SHOW result fields
+use a documented CUBRID 11.4 snapshot; the selected server may differ. Numeric
+values, file paths, arbitrary expressions, and most free-form command arguments
+are entered normally. Regenerate the vocabulary with
+`python3 tools/generate_completion_data.py /path/to/cubrid-manual --ref origin/release/11.4`.
+
+System catalog names and columns come from the selected database, including
+accessible `db_` and `_db_` objects. `FROM db_in` offers `db_index` and
+`db_index_key`; catalog aliases supply columns normally. System objects appear
+when their literal prefix is requested or an owner is supplied, keeping ordinary
+table lists focused on user objects. The current user's catalog visibility is
+preserved; underlying `_db_` classes may be available only to DBA.
 
 Column completion resolves simple table aliases. For example, `c.na` in
 `select * from code c where c.na` can complete to `c.name`. A table later in
 the same draft can supply columns for an unfinished `SELECT` list. With multiple
 tables, unqualified column suggestions include aliases to avoid ambiguity.
-System tables, CTE names, derived-table columns, synonyms, correlated outer
-aliases, and SQL fragments held only in csql's command buffer are outside this
-initial implementation.
+CTE names, derived-table columns, synonyms, correlated outer aliases, and SQL
+fragments held only in csql's command buffer are outside this implementation.
 
 Completion uses the installed `csql`, with no Python driver or editor dependency.
-It reads `db_class` and `db_attribute` as the launch user. Catalog queries stay
-outside the interactive SQL buffer and wrapper history. Metadata remains in
-memory for this wrapper session.
+It reads `db_class`, `db_attribute`, `db_index`, and `db_user` as the launch user.
+Catalog queries stay outside the interactive SQL buffer and wrapper history.
+Metadata remains in memory for this wrapper session.
 
 In client/server mode, the first Tab starts a background lookup. The open list
 updates when names arrive. A later Tab refreshes metadata after 60 seconds.

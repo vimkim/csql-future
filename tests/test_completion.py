@@ -22,11 +22,13 @@ class CompletionTest(unittest.TestCase):
   def test_show_keywords_are_contextual_with_or_without_metadata(self) -> None:
     cases = (
       ('sho', ['SHOW']),
-      ('SHOW ', ['COLUMNS', 'FULL', 'TABLES']),
+      ('SHOW ', ['ACCESS', 'ALL', 'ARCHIVE', 'COLLATION', 'COLUMNS', 'CREATE', 'CRITICAL',
+                 'EXEC', 'FULL', 'GRANTS', 'HEAP', 'INDEX', 'INDEXES', 'JOB', 'KEYS', 'LOG',
+                 'PAGE', 'SLOTTED', 'TABLES', 'THREADS', 'TIMEZONES', 'TRACE', 'TRAN', 'TRANSACTION', 'VOLUME']),
       ('sHoW tA', ['TABLES']),
-      ('show c', ['COLUMNS']),
+      ('show c', ['COLLATION', 'COLUMNS', 'CREATE', 'CRITICAL']),
       ('show f', ['FULL']),
-      ('show FULL ', ['COLUMNS', 'TABLES']),
+      ('show FULL ', ['COLUMNS', 'TABLES', 'TIMEZONES']),
       ('show full c', ['COLUMNS']),
       ('show columns ', ['FROM', 'IN']),
       ('show full columns f', ['FROM']),
@@ -74,14 +76,15 @@ class CompletionTest(unittest.TestCase):
         self.assertEqual(suggestions.start + len(candidate), position)
 
   def test_show_tails_do_not_inherit_underlying_columns_or_generic_sql(self) -> None:
-    for draft in ('show tables ', 'show full tables ', 'show tables where na',
-                  'show columns from code ', 'show columns in code where na',
+    for draft in ('show tables where na', 'show columns in code where na',
                   'show full columns from code where code.na',
                   'show columns from code where x in co',
                   'show columns bogus co', 'show columns from code, co',
                   'show "ta', 'show other.ta'):
       with self.subTest(draft=draft):
         self.assertEqual([], self.candidates(draft))
+    for draft in ('show tables ', 'show full tables ', 'show columns from code '):
+      self.assertEqual(['LIKE', 'WHERE'], self.candidates(draft))
     self.assertEqual(['COMMIT'], self.candidates('select * from code where id in co'))
     self.assertEqual(['name'], self.candidates('show tables; select na| from code'))
     self.assertEqual(self.candidates('select * from co'), self.candidates('show index from co'))
@@ -127,9 +130,9 @@ class CompletionTest(unittest.TestCase):
     self.assertEqual(['name'], self.candidates('select * from code c where (c.na|)'))
     self.assertEqual(['name'], self.candidates('insert into code (na'))
 
-  def test_comments_strings_and_session_commands_suppress_completion(self) -> None:
+  def test_comments_and_strings_suppress_completion(self) -> None:
     for draft in ("select 'co", "select 'co|ding' from code", '-- co',
-                  'select /* co', 'select -- co\n|', ';schema co',
+                  'select /* co', 'select -- co\n|',
                   'show /* ta', 'show -- ta', "show tables like 'co"):
       with self.subTest(draft=draft):
         text = draft.replace('|', '')

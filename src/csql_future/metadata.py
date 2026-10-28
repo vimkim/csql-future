@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 import signal
 import subprocess
@@ -14,14 +14,20 @@ from .completion import Relation, Schema
 
 
 CATALOG_QUERY = """
-SELECT 'relation' AS kind, CURRENT_USER AS login_name, owner_name, class_name,
+SELECT CASE WHEN is_system_class = 'YES' THEN 'system' ELSE 'relation' END AS kind,
+       CURRENT_USER AS login_name, owner_name, class_name,
        class_name AS item_name, class_type AS item_type
-FROM db_class WHERE is_system_class = 'NO'
+FROM db_class
 UNION ALL
 SELECT 'column', CURRENT_USER, a.owner_name, a.class_name, a.attr_name, a.attr_type
 FROM db_attribute a JOIN db_class c
 ON a.owner_name = c.owner_name AND a.class_name = c.class_name
-WHERE c.is_system_class = 'NO' AND a.attr_type IN ('INSTANCE', 'SHARED');
+WHERE a.attr_type IN ('INSTANCE', 'SHARED')
+UNION ALL
+SELECT 'index', CURRENT_USER, owner_name, class_name, index_name, 'INDEX'
+FROM db_index
+UNION ALL
+SELECT 'user', CURRENT_USER, CURRENT_USER, name, name, 'USER' FROM db_user;
 """
 HEADER = ['kind', 'login_name', 'owner_name', 'class_name', 'item_name', 'item_type']
 MAX_CATALOG_BYTES = 16 * 1024 * 1024
@@ -55,6 +61,8 @@ def parse_catalog(output: bytes) -> Schema:
     raise ValueError('missing catalog header')
   relations = {}
   columns: dict[tuple[str, str], list[str]] = {}
+  indexes: dict[tuple[str, str], list[str]] = {}
+  users = set()
   user = ''
   for line in lines[1:]:
     if not line:
@@ -67,16 +75,21 @@ def parse_catalog(output: bytes) -> Schema:
       raise ValueError('invalid catalog identity')
     user = login
     key = owner, name
-    if kind == 'relation' and item_type in ('CLASS', 'VCLASS'):
-      relations[key] = item_type
+    if kind in ('relation', 'system') and item_type in ('CLASS', 'VCLASS'):
+      relations[key] = item_type, kind == 'system'
     elif kind == 'column' and item_type in ('INSTANCE', 'SHARED'):
       columns.setdefault(key, []).append(item)
+    elif kind == 'index' and item_type == 'INDEX':
+      indexes.setdefault(key, []).append(item)
+    elif kind == 'user' and item_type == 'USER':
+      users.add(item)
     else:
       raise ValueError('invalid catalog kind')
   return Schema(user, tuple(
-    Relation(owner, name, kind, tuple(sorted(set(columns.get((owner, name), ())), key=str.casefold)))
-    for (owner, name), kind in sorted(relations.items())
-  ))
+    Relation(owner, name, kind, tuple(sorted(set(columns.get((owner, name), ())), key=str.casefold)), system,
+             tuple(sorted(set(indexes.get((owner, name), ())), key=str.casefold)))
+    for (owner, name), (kind, system) in sorted(relations.items())
+  ), tuple(sorted(users, key=str.casefold)))
 
 
 class CatalogCache:
@@ -128,6 +141,8 @@ class CatalogCache:
   def _load(self) -> None:
     try:
       schema = self._read()
+      if self.connection is not None:
+        schema = replace(schema, database=self.connection.arguments[-1].split('@')[0])
     except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
       with self.lock:
         self.message = 'Schema refresh failed; using cached names' if self.schema.relations else 'Schema unavailable; keywords only'

@@ -21,6 +21,25 @@ class MetadataTest(unittest.TestCase):
     self.assertEqual(('name\twith\nline\\slash',), schema.relations[0].columns)
     self.assertEqual(('other_id',), schema.relations[1].columns)
 
+  def test_system_relations_indexes_and_users_share_one_snapshot(self) -> None:
+    rows = [
+      '\t'.join(HEADER),
+      'index\tREADER\tDBA\tcode\tidx_name\tINDEX',
+      'index\tREADER\tOTHER\tcode\tidx_other\tINDEX',
+      'system\tREADER\tDBA\tdb_class\tdb_class\tVCLASS',
+      'column\tREADER\tDBA\tdb_class\towner_name\tINSTANCE',
+      'relation\tREADER\tDBA\tcode\tcode\tCLASS',
+      'relation\tREADER\tOTHER\tcode\tcode\tCLASS',
+      'user\tREADER\tREADER\tPUBLIC\tPUBLIC\tUSER',
+      'user\tREADER\tREADER\tREADER\tREADER\tUSER',
+    ]
+    schema = parse_catalog(('\n'.join(rows) + '\n').encode())
+    self.assertEqual(('PUBLIC', 'READER'), schema.users)
+    self.assertEqual(('idx_name',), schema.relations[0].indexes)
+    self.assertTrue(schema.relations[1].system)
+    self.assertEqual(('owner_name',), schema.relations[1].columns)
+    self.assertEqual(('idx_other',), schema.relations[2].indexes)
+
   def test_invalid_output_is_rejected_instead_of_becoming_candidates(self) -> None:
     for output in (b'ERROR: failure', b'', '\t'.join(HEADER).encode() + b'\nshort\trow',
                    '\t'.join(HEADER).encode() + b'\nrelation\tDBA\tDBA\tbad\\x\tx\tCLASS'):

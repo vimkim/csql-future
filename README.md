@@ -41,7 +41,8 @@ Simple aliases work too, as shown below with `e.`.
 
 Use Up/Down to choose a candidate and **Enter** to insert it. SQL runs only
 after the list closes and you press Enter again. **Esc** keeps the original draft.
-Completion also guides `SHOW TABLES` and `SHOW COLUMNS FROM/IN`.
+Completion also guides CSQL `;` commands, inspection and diagnostic SQL,
+parameters, and accessible `db_` / `_db_` catalog names.
 
 *These are captures of the actual editor, using illustrative history and an
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.md).*
@@ -92,7 +93,8 @@ and keep using their existing `.csql_history.sqlite3` files.
 
 - **Persistent history:** SQLite stores up to 10,000 unique submissions by
   default. History is local to the launch directory unless you select a shared file.
-- **Database-aware names:** metadata comes from `db_class` and `db_attribute`
+- **Database-aware names:** metadata comes from `db_class`, `db_attribute`,
+  `db_index`, and `db_user`
   through a separate, bounded `csql` process. Metadata queries stay outside your
   interactive SQL buffer and history.
 - **Editable drafts:** multiline input, familiar Unix editing keys, and an
@@ -119,9 +121,8 @@ starts. Restart to see schema changes. Metadata reads use credentials supplied
 at launch; a password entered later at CSQL's prompt cannot be reused.
 If metadata is unavailable, editing and keyword completion remain available.
 
-CTEs, derived-table columns, correlated outer aliases, synonyms, system tables,
-and SQL held only in CSQL's internal command buffer are outside the current
-completion scope. Interactive support is Linux-first; broader platform support
+CTEs, derived-table columns, correlated outer aliases, synonyms, and SQL held
+only in CSQL's internal command buffer are outside the current completion scope. Interactive support is Linux-first; broader platform support
 and ordinary-CSQL fallback for unsupported prompt states remain future work.
 
 ## Try it in your daily SQL work

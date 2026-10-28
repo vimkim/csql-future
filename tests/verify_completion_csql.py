@@ -10,6 +10,7 @@ import tempfile
 from verify_editable_csql import Session, checked_run
 from verify_real_csql import isolate_runtime, require_program
 from csql_future.metadata import CATALOG_QUERY, parse_catalog
+from csql_future.completion import suggest
 
 
 def check_completion(mode: str, database: str, environment: dict[str, str], root: Path) -> None:
@@ -73,6 +74,60 @@ def check_show_completion(mode: str, database: str, environment: dict[str, str],
     session.close()
 
 
+def check_live_metadata(schema) -> None:
+  for draft, expected in (
+    ('select * from db_cl', 'db_class'),
+    ('select * from _db_cl', '_db_class'),
+    ('SHOW INDEX HEADER OF code.idx', 'idx_code_name'),
+    ('SHOW GRANTS FOR CWH', 'CWH_READER'),
+  ):
+    assert expected in {c.text for c in suggest(draft, len(draft), schema).candidates}, draft
+  draft = 'select c.cl from db_class c'
+  assert 'class_name' in {c.text for c in suggest(draft, draft.index(' from'), schema).candidates}
+  print('PASS real catalog names, catalog columns, index names and users', flush=True)
+
+
+def check_command_completion(mode, database, environment, root) -> None:
+  history = root / ('commands-history-' + mode + '.sqlite3')
+  session = Session(['--history-file', str(history), mode, '-u', 'dba', '--no-pager', database], environment, root)
+  cases = (
+    (b';pl', '> ;plan  query plan', ';plan', b' detail'),
+    (b'SHOW INDEX HEADER OF code.idx_code_n', '> idx_code_name  index code',
+     'SHOW INDEX HEADER OF code.idx_code_name', b';'),
+    (b'SHOW CREATE TABLE co', '> code  table DBA', 'SHOW CREATE TABLE code', b';'),
+    (b'SHOW THREADS WHERE st', '> Status  result column', "SHOW THREADS WHERE Status", b" = 'FREE';"),
+    (b'SELECT class_name FROM db_cl', '> db_class  catalog view DBA', 'SELECT class_name FROM db_class', b';'),
+    (b"SET SYSTEM PARAMETERS 'lock_timeout=D';\x02\x02", '> DEFAULT  parameter value',
+     "SET SYSTEM PARAMETERS 'lock_timeout=DEFAULT';", b''),
+  )
+  commands = []
+  try:
+    session.expect('csql-future>')
+    for keys, menu, accepted, suffix in cases:
+      session.send(keys + b'\t')
+      session.expect(menu)
+      session.send(b'\r')
+      session.read_for(0.1)
+      with closing(sqlite3.connect(history)) as connection:
+        assert connection.execute('SELECT count(*) FROM submissions').fetchone()[0] == len(commands)
+      # Parameter completion leaves the cursor inside the quoted value.
+      if keys.startswith(b'SET SYSTEM'):
+        session.send(b'\x05')
+      command = accepted + suffix.decode()
+      session.send(suffix + b'\r')
+      session.expect_csql_echo(command)
+      session.expect('csql-future>')
+      commands.append(command)
+    assert session.finish() == 0
+    with closing(sqlite3.connect(history)) as connection:
+      actual = [row[0] for row in connection.execute('SELECT command FROM submissions ORDER BY id')]
+    assert actual == commands + [';exit'], actual
+    assert b'ERROR:' not in bytes(session.output), bytes(session.output)[-3000:]
+    print('PASS real {} session, diagnostics, catalogs and parameter completion without early submission'.format(mode), flush=True)
+  finally:
+    session.close()
+
+
 def main() -> None:
   cubrid = require_program('cubrid')
   csql = require_program('csql')
@@ -93,6 +148,7 @@ def main() -> None:
     checked_run([csql, '-S', '-u', 'dba', '-c', """
       CREATE TABLE code (id INTEGER, name VARCHAR(40));
       CREATE TABLE coding (id INTEGER, language_name VARCHAR(40));
+      CREATE INDEX idx_code_name ON code(name);
       INSERT INTO code VALUES (1, 'code-row');
       INSERT INTO coding VALUES (2, 'coding-row');
       CREATE USER cwh_reader PASSWORD 'test-only-password';
@@ -101,19 +157,27 @@ def main() -> None:
     result = subprocess.run([csql, '-S', '-u', 'dba', '-r', '-t', '-c', CATALOG_QUERY, database],
                             env=environment, cwd=run, capture_output=True, timeout=10, check=True)
     schema = parse_catalog(result.stdout)
-    assert {'code', 'coding'} <= {r.name for r in schema.relations}, result.stdout
+    assert {'code', 'coding'} <= {r.name for r in schema.relations}
+    assert {'db_class', '_db_class'} <= {r.name for r in schema.relations if r.system}
+    assert {'DBA', 'PUBLIC', 'CWH_READER'} <= set(schema.users)
+    assert ('idx_code_name',) == next(r.indexes for r in schema.relations if r.name == 'code')
+    check_live_metadata(schema)
     check_completion('-S', database, environment, run)
     check_show_completion('-S', database, environment, run)
+    check_command_completion('-S', database, environment, run)
     restricted = subprocess.run([csql, '-S', '-u', 'cwh_reader', '-p', 'test-only-password',
                                  '-r', '-t', '-c', CATALOG_QUERY, database],
                                 env=environment, cwd=run, capture_output=True, timeout=10, check=True)
     restricted_schema = parse_catalog(restricted.stdout)
-    assert {r.name for r in restricted_schema.relations} == {'code'}, restricted.stdout
+    assert {r.name for r in restricted_schema.relations if not r.system} == {'code'}
+    assert 'db_class' in {r.name for r in restricted_schema.relations if r.system}
+    assert '_db_class' not in {r.name for r in restricted_schema.relations}
     print('PASS real catalog respects user permissions', flush=True)
     server_command(cubrid, 'start', database, environment, run)
     try:
       check_completion('-C', database, environment, run)
       check_show_completion('-C', database, environment, run)
+      check_command_completion('-C', database, environment, run)
       check_refresh(database, environment, run)
     finally:
       server_command(cubrid, 'stop', database, environment, run)

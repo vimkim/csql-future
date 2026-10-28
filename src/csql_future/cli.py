@@ -445,7 +445,7 @@ class DraftEditor:
     "Ctrl+R: Search query history (enters history search mode)",
     "Ctrl+Q: quit, discarding the draft",
     "Draft:",
-    "Tab: complete a keyword, table, or column",
+    "Tab: complete SQL, session commands, or database names",
     "Enter: submit draft",
     "Ctrl+Enter / Ctrl+J: insert newline",
     "Ctrl+X Ctrl+E: open draft in $VISUAL/$EDITOR",

@@ -499,6 +499,64 @@ finally:
     self.assertNotIn('name  column', self.rendered_screen(session))
     self.assertEqual(['show tables;'], self.stored_commands())
 
+  def test_session_command_and_argument_acceptance_never_executes(self) -> None:
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    session.send(b';pl\t')
+    session.read_until(b'> ;plan  query plan')
+    session.send(b'\r de\t')
+    session.read_until(b'> detail  keyword')
+    session.send(b'\r')
+    session.read_for(0.1)
+    self.assertEqual([], self.stored_commands())
+    self.assertIn('csql-future> ;plan detail', self.rendered_screen(session))
+    session.send(b'\r')
+    session.read_until(b';plan detail')
+    session.read_until(b'csql-future>')
+    self.assertEqual([';plan detail'], self.stored_commands())
+
+  def test_catalog_columns_and_indexes_use_the_existing_cache(self) -> None:
+    self.enable_catalog()
+    self.environment['SYNTHETIC_CATALOG'] += '\n' + '\n'.join((
+      'system\tDBA\tDBA\tdb_class\tdb_class\tVCLASS',
+      'column\tDBA\tDBA\tdb_class\tclass_name\tINSTANCE',
+      'index\tDBA\tDBA\tcode\tidx_name\tINDEX',
+    ))
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    for draft, menu, accepted in (
+      (b'select * from db_cl', b'> db_class  catalog view DBA', 'select * from db_class'),
+      (b'select d.cl from db_class d', b'> class_name  column d', 'select d.class_name from db_class d'),
+      (b'SHOW INDEX HEADER OF code.idx', b'> idx_name  index code', 'SHOW INDEX HEADER OF code.idx_name'),
+    ):
+      keys = draft
+      if draft.startswith(b'select d.cl'):
+        keys += b'\x1b[D' * len(' from db_class d')
+      session.send(keys + b'\t')
+      session.read_until(menu)
+      session.send(b'\r')
+      session.read_for(0.1)
+      self.assertEqual([], self.stored_commands())
+      self.assertIn(accepted, self.rendered_screen(session))
+      session.send(b'\x03')
+    self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
+
+  def test_diagnostic_fields_and_parameter_string_completion_preserve_suffix(self) -> None:
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    session.send(b'SHOW THREADS WHERE st;\x02\t')
+    session.read_until(b'> Status  result column')
+    session.send(b'\r')
+    session.read_for(0.1)
+    self.assertIn('SHOW THREADS WHERE Status;', self.rendered_screen(session))
+    self.assertEqual([], self.stored_commands())
+    session.send(b"\x03SET SYSTEM PARAMETERS 'lock_t';\x02\x02\t")
+    session.read_until(b'> lock_timeout=  parameter msec')
+    session.send(b'\r')
+    session.read_for(0.1)
+    self.assertIn("SET SYSTEM PARAMETERS 'lock_timeout=';", self.rendered_screen(session))
+    self.assertEqual([], self.stored_commands())
+
   def test_completion_help_preserves_selection_and_external_editor_remains_available(self) -> None:
     self.enable_catalog()
     self.configure_editor("print('COMPLETION-EDITOR-RETURN', flush=True)\npath.write_text('select edited;\\n')\n")
