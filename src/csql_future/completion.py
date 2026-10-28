@@ -17,6 +17,20 @@ RIGHT ROLLBACK SELECT SET SHOW STATISTICS TABLE THEN UNION UPDATE VALUES VIEW WH
 """.split())
 
 
+# CUBRID 11.5 parser_hint_table snapshot from src/parser/csql_grammar.y.
+# Source: CUBRID/CUBRID@cc947788d3b7dc402f46192d0f3299ddcc8563ba.
+HINTS = tuple("""
+BIND_SENSITIVE DBLINK_NO_PUSH_DOWN_SUBQ INDEX_LS INDEX_SS INLINE INSERT_EXECUTION_MODE
+JDBC_CACHE LEADING LOCK_TIMEOUT MATERIALIZE NO_COVERING_IDX NO_DESC_IDX NO_ELIMINATE_JOIN
+NO_HASH_AGGREGATE NO_HASH_LIST_SCAN NO_INDEX_LS NO_INDEX_SS NO_LOGGING NO_MERGE
+NO_MULTI_RANGE_OPT NO_PARALLEL_HASH_JOIN NO_PARALLEL_SCAN NO_PARALLEL_SUBQUERY NO_PUSH_PRED
+NO_SORT_LIMIT NO_SUBQUERY_CACHE NO_SUPPLEMENTAL_LOG NO_UNNEST NO_USE_HASH ORDERED PARALLEL
+QUERY_CACHE QUERY_NO_CACHE RECOMPILE REEXECUTE SELECT_BTREE_NODE_INFO SELECT_KEY_INFO
+SELECT_PAGE_INFO SELECT_RECORD_INFO SKIP_UPDATE_NULL SQL_CACHE SQL_NO_CACHE USE_DESC_IDX
+USE_HASH USE_IDX USE_INSERT_IDX USE_MERGE USE_NL USE_SBR USE_UPDATE_IDX
+""".split())
+
+
 # CUBRID 11.5 reserved-word snapshot from src/parser/keyword.c and the manual.
 # Keep quoting separate from the smaller list offered as keyword suggestions.
 RESERVED = frozenset("""
@@ -134,7 +148,7 @@ def tokenize(text: str) -> list[Token]:
       index += 1
       continue
     kind, closed = "symbol", True
-    if text.startswith('--', index):
+    if text.startswith(('--', '//'), index):
       end = text.find('\n', index)
       index = len(text) if end < 0 else end
       kind, closed = "comment", end >= 0
@@ -321,6 +335,30 @@ def parameter_suggestions(text: str, cursor: int, start: int, end: int, setting:
   return Suggestions(replace_start, replace_end, candidates)
 
 
+def hint_suggestions(text: str, cursor: int, comment: Token) -> Suggestions:
+  """Complete hint names while preserving comment delimiters and arguments."""
+  start = comment.start + 3
+  end = comment.end - (2 if comment.text.startswith('/*') and comment.closed else 0)
+  if not start <= cursor <= end:
+    return Suggestions(cursor, cursor, (), allowed=False)
+  body = text[start:end]
+  position = cursor - start
+  tokens = tokenize(body)
+  current = next((t for t in tokens if t.start <= position <= t.end and t.kind in (
+    'word', 'identifier', 'string', 'comment'
+  )), None)
+  left, right = (current.start, current.end) if current else (position, position)
+  before = [t for t in tokens if t.end <= left]
+  depth = sum(1 if t.text == '(' else -1 if t.text == ')' else 0
+              for t in before if t.kind == 'symbol')
+  if depth or (current and current.kind != 'word') or (left and not body[left - 1].isspace()):
+    return Suggestions(cursor, cursor, (), allowed=False)
+  prefix = body[left:position].casefold()
+  return ordered_suggestions(start + left, start + right, [
+    Candidate(word, 'query hint') for word in HINTS if word.casefold().startswith(prefix)
+  ])
+
+
 def session_suggestions(text: str, cursor: int, schema: Schema) -> Suggestions:
   command = re.match(r'\s*;([.\w-]*)', text)
   assert command is not None
@@ -353,10 +391,12 @@ def suggest(text: str, cursor: int, schema: Schema = Schema(), message: str = ''
 def complete(text: str, cursor: int, schema: Schema, tokens: list[Token], session: bool = False) -> Suggestions:
   current = next((t for t in tokens if t.start < cursor <= t.end and (
     t.kind in ('word', 'identifier') or t.kind in ('comment', 'string') and (
-      cursor < t.end or not t.closed or t.text.startswith('--')
+      cursor < t.end or not t.closed or t.text.startswith(('--', '//'))
     )
   )), None)
   if current and current.kind in ('comment', 'string'):
+    if not session and current.kind == 'comment' and current.text.startswith(('/*+', '--+', '//+')):
+      return hint_suggestions(text, cursor, current)
     preceding = [t.keyword for t in statement_scope(tokens, cursor) if t.end <= current.start]
     if current.kind == 'string' and preceding == ['SET', 'SYSTEM', 'PARAMETERS']:
       end = current.end - (1 if current.closed else 0)

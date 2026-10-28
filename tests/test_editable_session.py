@@ -461,6 +461,21 @@ finally:
     session.read_until(b'EXECUTED=["SHOW TABLES;"]')
     self.assertEqual(['SHOW TABLES;'], self.stored_commands())
 
+  def test_hint_completion_preserves_the_comment_and_accepts_without_execution(self) -> None:
+    session = self.start(['-S'])
+    session.read_until(b'csql-future>')
+    session.send(b'select /*+ ordered rewrong */ 42;')
+    session.send(b'\x02' * len('wrong */ 42;') + b'\t')
+    session.read_until(b'> RECOMPILE  query hint')
+    session.send(b'\r')
+    session.read_for(0.1)
+    self.assertEqual([], self.stored_commands())
+    self.assertNotIn(b'EXECUTED=', bytes(session.output))
+    self.assertIn('csql-future> select /*+ ordered RECOMPILE */ 42;', self.rendered_screen(session))
+    session.send(b'\r')
+    session.read_until(b'EXECUTED=["select /*+ ordered RECOMPILE */ 42;"]')
+    self.assertEqual(['select /*+ ordered RECOMPILE */ 42;'], self.stored_commands())
+
   def test_show_columns_completion_uses_both_connectors_and_cached_relations(self) -> None:
     self.enable_catalog()
     session = self.start(['-C'])

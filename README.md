@@ -44,6 +44,12 @@ after the list closes and you press Enter again. **Esc** keeps the original draf
 Completion also guides CSQL `;` commands, inspection and diagnostic SQL,
 parameters, and accessible `db_` / `_db_` catalog names.
 
+Inside CUBRID hint comments, Tab completes hint names: `select /*+ re` offers
+`RECOMPILE`, and `select /*+ RECOMPILE use_` offers matching join/index hints.
+This works with `/*+ ... */`, `--+`, and `//+`, including unfinished comments.
+Hint names use a CUBRID 11.5 parser snapshot; arguments such as `USE_NL(t)` are
+entered manually. Ordinary comments and strings keep literal Tab input.
+
 *These are captures of the actual editor, using illustrative history and an
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.md).*
 
