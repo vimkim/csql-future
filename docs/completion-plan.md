@@ -7,7 +7,7 @@ the installed `csql`. No new Python runtime dependency is required.
 
 ## Checklist
 
-- [ ] **1. Completion menu.** Add Tab, Ctrl+N/P, Enter, and Esc handling.
+- [x] **1. Completion menu.** Add Tab, Ctrl+N/P, Enter, and Esc handling.
   Enter accepts a candidate without submitting SQL. Other modes retain their keys.
 - [ ] **2. SQL context.** Detect table positions in unfinished SQL. Replace the
   identifier at the cursor. Respect comments, strings, owners, and quoted names.
@@ -44,11 +44,14 @@ Metadata failure leaves SQL editing and execution available.
 
 - Created work item 560 and a separate worktree from `main` at `0e95b34`.
 - Preserved the separate help/editor task and the older fallback task.
-- Next action: implement the menu with fixed candidates, then verify its keys.
+- Menu implementation and focused PTY verification are complete.
+- Next action: add SQL context detection and identifier replacement.
 
 ## Verification log
 
-No implementation checks have run yet.
+Step 1: two completion PTY tests passed. The existing indentation/editing test
+passed after moving its literal Tab to an indentation position. The initial
+full run passed 59 tests and exposed that obsolete Tab expectation.
 
 ## Resume
 

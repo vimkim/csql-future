@@ -400,6 +400,40 @@ finally:
     session.read_until(b'EXECUTED=["select right;"]')
     self.assertEqual(["select right;"], self.stored_commands())
 
+  def test_completion_menu_accepts_without_execution_and_keeps_history_keys(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"se\t")
+    session.read_until(b"Completion |")
+    self.assertIn("SELECT", self.rendered_screen(session))
+    session.send(b"\x0e\x10\r")
+    session.read_for(0.1)
+    self.assertEqual([], self.stored_commands())
+    self.assertNotIn(b"EXECUTED=", bytes(session.output))
+    session.send(b" 42;\r")
+    session.read_until(b'EXECUTED=["SELECT 42;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x10\r")
+    session.read_until(b'EXECUTED=["SELECT 42;"]')
+    self.assertEqual(["SELECT 42;", "SELECT 42;"], self.stored_commands())
+
+  def test_completion_cancel_and_no_match_preserve_the_draft(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"se\t\x0e\x1b")
+    session.read_for(0.15)
+    session.send(b"lect 43;\r")
+    session.read_until(b'EXECUTED=["select 43;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"nonesuch\t\r")
+    session.read_until(b"(no completions)")
+    session.read_for(0.1)
+    self.assertEqual(["select 43;"], self.stored_commands())
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    session.send(b";\r")
+    session.read_until(b'EXECUTED=["nonesuch;"]')
+
   def test_unix_editing_keys_preserve_the_draft_around_the_cursor(self) -> None:
     cases = (
       (b"select 12;\x01\x06\x06\x05\x02\x02\x04\r", "select 1;"),
@@ -1577,8 +1611,8 @@ finally:
     session.read_until(b'EXECUTED=["select", "84;"]')
     session.read_until(b"csql-with-history>")
 
-    session.send(b"select\t21;\r")
-    session.read_until(b'EXECUTED=["select\\t21;"]')
+    session.send(b"\tselect 21;\r")
+    session.read_until(b'EXECUTED=["\\tselect 21;"]')
     session.read_until(b"csql-with-history>")
 
     session.send(b"discard this draft\x03select 100;\r")

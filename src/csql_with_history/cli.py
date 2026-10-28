@@ -41,6 +41,8 @@ from typing import Callable, List, Optional, Sequence, Tuple
 import unicodedata
 import uuid
 
+from .completion import CompletionMenu, suggest
+
 DEFAULT_HISTORY_LIMIT = 10_000
 DEFAULT_HISTORY_NAME = ".csql_history.sqlite3"
 HISTORY_BUSY_TIMEOUT_MILLISECONDS = 300
@@ -314,6 +316,7 @@ class EditorAction(Enum):
   SEARCH = auto()
   HELP = auto()
   EXTERNAL_EDITOR = auto()
+  COMPLETE = auto()
   CANCEL = auto()
   IGNORE = auto()
 
@@ -488,6 +491,7 @@ class DraftEditor:
     self.unfinished_text = ""
     self.unfinished_cursor = 0
     self.search = HistorySearch()
+    self.completion = CompletionMenu()
     self.show_help = False
     self.help_scroll = 0
     self.help_page_rows = 1
@@ -505,6 +509,7 @@ class DraftEditor:
       self.unfinished_text = ""
       self.unfinished_cursor = 0
       self.search = HistorySearch()
+      self.completion = CompletionMenu()
       self.show_help = False
       self.help_scroll = 0
       self.editor_prefix = False
@@ -539,9 +544,31 @@ class DraftEditor:
           self._render()
           continue
         if event.action is EditorAction.SEARCH:
+          self.completion.active = False
           if not self.search.active:
             self.search.activate(self.history.records())
           self._render()
+          continue
+        if self.completion.active:
+          if event.action in (EditorAction.DOWN, EditorAction.HISTORY_NEWER, EditorAction.COMPLETE):
+            self.completion.move(1)
+          elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
+            self.completion.move(-1)
+          elif event.action is EditorAction.SUBMIT:
+            if self.completion.suggestions.candidates:
+              self.draft.text, self.draft.cursor = self.completion.accept()
+              self.history_index = None
+          elif event.action is EditorAction.CANCEL:
+            self.completion.active = False
+          elif event.action is not EditorAction.REDRAW:
+            self.completion.active = False
+            # Editing keys apply to the unchanged draft after closing the menu.
+            if event.action is EditorAction.INTERRUPT:
+              self.draft.text = ""
+              self.draft.cursor = 0
+            else:
+              self.draft.handle(event)
+          self._render(force=event.action is EditorAction.REDRAW)
           continue
         if self.search.active:
           if event.action is EditorAction.INTERRUPT:
@@ -560,6 +587,13 @@ class DraftEditor:
           continue
         if event.action is EditorAction.SUBMIT:
           return self.draft.text
+        if event.action is EditorAction.COMPLETE:
+          if not self.draft.text[:self.draft.cursor].strip():
+            self.draft.insert("\t")
+          else:
+            self.completion.open(self.draft.text, self.draft.cursor, suggest(self.draft.text, self.draft.cursor))
+          self._render()
+          continue
         if event.action is EditorAction.EOF:
           if not self.draft.text:
             return None
@@ -695,7 +729,7 @@ class DraftEditor:
     if action is not None:
       return KeyEvent(action)
     if first == b"\x09":
-      return KeyEvent(EditorAction.INSERT, "\t")
+      return KeyEvent(EditorAction.COMPLETE)
     if first == b"\x1b":
       return self._read_escape()
     if first < b"\x20":
@@ -786,7 +820,7 @@ class DraftEditor:
       visual_lines.extend(wrapped)
 
     status = self._search_status(content_width) if self.search.active else self._status(len(lines), content_width)
-    reserved_rows = len(status) + (4 if self.search.active else 1)
+    reserved_rows = 5 if self.completion.active else len(status) + (4 if self.search.active else 1)
     if self.show_help:
       # A bounded preview keeps the draft visible and never grows while scrolling.
       reserved_rows = min(14, max(2, terminal_size.lines - 1))
@@ -807,6 +841,17 @@ class DraftEditor:
       output[0] = PROMPT_STYLE + prompt + RESET + output[0][len(prompt):]
     if self.show_help:
       self._render_help(output, content_width, min(reserved_rows, terminal_size.lines - len(output)))
+    elif self.completion.active:
+      suggestions = self.completion.suggestions
+      available = max(1, min(6, terminal_size.lines - len(output) - 1))
+      start = max(0, self.completion.selected - available + 1)
+      if suggestions.candidates:
+        for index, candidate in enumerate(suggestions.candidates[start:start + available], start):
+          marker = "> " if index == self.completion.selected else "  "
+          output.append(self._truncate(marker + candidate.text + "  " + candidate.detail, content_width))
+      else:
+        output.append(self._truncate(suggestions.message or "(no completions)", content_width))
+      output.append(STATUS_STYLE + self._truncate(" Completion | Ctrl+N/P select | Enter accepts | Esc cancels ", content_width) + RESET)
     elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
       cursor_visual_row = len(output)
