@@ -68,13 +68,24 @@ after a resize, even when exported `COLUMNS` or `LINES` values are stale.
 The editor starts in **Input mode**. Ctrl+R switches to **History search mode**;
 recalling a result or canceling the search returns to Input mode. The status bar
 names the active mode.
+The status bar highlights **Ctrl+R history** and **Ctrl+Q quit** in Input mode.
+History search shows **Ctrl+Q quit**, **Enter recall**, and **Esc back** as space
+allows. Essential keys wrap onto additional status rows in narrow terminals;
+secondary hints are omitted when space is tight.
 
 In either mode, `?` in an empty input field opens that mode's shortcut panel.
 **F1** opens it at any time, including while editing a nonempty draft or search
-query. The panel separates the mode's actions from its text-editing shortcuts.
-`?`, F1, Esc, or Enter closes it; Up/Down or Ctrl+P/N scrolls it in a short
-terminal. Closing help preserves the draft, search query, selection, and cursor.
+query. Help opens a bounded inline preview with grouped actions, highlighted
+keys, and a fixed title and footer. **Ctrl+R: Search query history (enters
+history search mode)** appears at the top of Input mode help. The position
+indicator shows the visible rows and total. Up/Down or Ctrl+P/N scrolls the
+contents, Page Up/Down moves a page, and Home/End jumps to the beginning/end.
+`?`, F1, Esc, or Enter closes it. Closing help preserves the draft, search query,
+selection, and cursor.
 Question marks in nonempty fields remain ordinary text.
+The preview uses the normal terminal screen; no alternate screen is needed.
+Opening it can push earlier output into scrollback when space is limited, while
+scrolling within it keeps the preview frame and draft in place.
 
 In Input mode:
 
@@ -152,6 +163,14 @@ the prompt rather than a full-screen interface: it keeps the unfinished draft
 visible, marks one selected result, limits its result window to the available
 terminal height, and reports an explicit no-match state. Long results are
 truncated for display only; recalling them preserves their complete text.
+Each result has a right-aligned age such as `(3 min ago)` or `(2 days ago)`.
+This is the most recent **submission** time for that exact query, including
+submissions that failed. It is saved with history and survives restarts;
+memory-only history also tracks ages for the current session. Timestamps are
+recorded from this version onward. Older entries show `(time unknown)` until
+submitted again. Writable stores are upgraded automatically; `--no-history`
+can read older stores without modifying them. Narrow terminals shorten
+`(just now)` to `(now)` and `(time unknown)` to `(unknown)`.
 
 The selected file is the history scope, independent of the database name or
 connection target. The default hidden file isolates launch directories; an

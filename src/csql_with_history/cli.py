@@ -94,6 +94,8 @@ RESET = "\033[0m"
 PROMPT_STYLE = "\033[1;38;2;203;166;247m"
 STATUS_STYLE = "\033[38;2;205;214;244;48;2;24;24;37m"
 STATUS_KEY_STYLE = "\033[1;38;2;137;180;250;48;2;24;24;37m"
+HELP_KEY_STYLE = "\033[1;38;2;137;180;250m"
+HISTORY_TIME_STYLE = "\033[38;2;166;173;200m"
 MEMORY_ONLY_STATUS = " MEMORY-ONLY history | entries disappear on exit | "
 
 
@@ -121,12 +123,35 @@ class HistoryMode(Enum):
   SAVE_DISABLED = auto()
 
 
+@dataclass(frozen=True)
+class HistoryEntry:
+  command: str
+  submitted_at: Optional[float] = None
+
+
+def format_history_age(submitted_at: Optional[float], now: Optional[float] = None) -> str:
+  if submitted_at is None:
+    return "time unknown"
+  elapsed = max(0, int((time.time() if now is None else now) - submitted_at))
+  if elapsed < 5:
+    return "just now"
+  for seconds, singular, plural in (
+    (31536000, "year", "years"), (2592000, "month", "months"),
+    (86400, "day", "days"), (3600, "hr", "hr"),
+    (60, "min", "min"), (1, "sec", "sec"),
+  ):
+    count = elapsed // seconds
+    if count:
+      return "{} {} ago".format(count, singular if count == 1 else plural)
+  return "just now"
+
+
 class SubmissionHistory:
 
   def __init__(self, path: Path, limit: int, save_disabled: bool) -> None:
     self.limit = limit
     self.mode = HistoryMode.SAVE_DISABLED if save_disabled else HistoryMode.PERSISTENT
-    self.memory_entries: List[str] = []
+    self.memory_entries: List[HistoryEntry] = []
     self.connection: Optional[sqlite3.Connection] = None
     try:
       if save_disabled:
@@ -147,11 +172,15 @@ class SubmissionHistory:
       )
       if not save_disabled:
         self._enable_wal()
-        self.connection.execute(
-          "CREATE TABLE IF NOT EXISTS submissions "
-          "(id INTEGER PRIMARY KEY, command TEXT NOT NULL)"
-        )
-        self.connection.commit()
+        # Serialize legacy migration with other writers opening the same store.
+        with self.connection:
+          self.connection.execute("BEGIN IMMEDIATE")
+          self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS submissions "
+            "(id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL)"
+          )
+          if "submitted_at" not in self._columns():
+            self.connection.execute("ALTER TABLE submissions ADD COLUMN submitted_at REAL")
       self._refresh_memory()
     except sqlite3.Error as error:
       self._handle_storage_failure(error)
@@ -175,13 +204,17 @@ class SubmissionHistory:
   def save(self, text: str) -> None:
     if self.mode is HistoryMode.SAVE_DISABLED or text.startswith(" "):
       return
+    entry = HistoryEntry(text, time.time())
     if self.mode is HistoryMode.MEMORY_ONLY:
-      self._remember(text)
+      self._remember(entry)
       return
     assert self.connection is not None
     try:
       with self.connection:
-        self.connection.execute("INSERT INTO submissions(command) VALUES (?)", (text,))
+        self.connection.execute(
+          "INSERT INTO submissions(command, submitted_at) VALUES (?, ?)",
+          (entry.command, entry.submitted_at),
+        )
         self.connection.execute(
           "DELETE FROM submissions WHERE id NOT IN "
           "(SELECT id FROM submissions ORDER BY id DESC LIMIT ?)",
@@ -189,9 +222,12 @@ class SubmissionHistory:
         )
     except sqlite3.Error as error:
       self._handle_storage_failure(error)
-    self._remember(text)
+    self._remember(entry)
 
   def entries(self) -> List[str]:
+    return [entry.command for entry in self.records()]
+
+  def records(self) -> List[HistoryEntry]:
     if self.connection is not None:
       try:
         self._refresh_memory()
@@ -199,21 +235,27 @@ class SubmissionHistory:
         self._handle_storage_failure(error)
     entries = []
     seen = set()
-    for command in reversed(self.memory_entries):
-      if command not in seen:
-        entries.append(command)
-        seen.add(command)
+    for entry in reversed(self.memory_entries):
+      if entry.command not in seen:
+        entries.append(entry)
+        seen.add(entry.command)
     return entries
+
+  def _columns(self) -> List[str]:
+    assert self.connection is not None
+    return [row[1] for row in self.connection.execute("PRAGMA table_info(submissions)")]
 
   def _refresh_memory(self) -> None:
     assert self.connection is not None
+    # --no-history must also read older stores without changing their schema.
+    timestamp_column = "submitted_at" if "submitted_at" in self._columns() else "NULL"
     rows = self.connection.execute(
-      "SELECT command FROM submissions ORDER BY id"
+      "SELECT command, {} FROM submissions ORDER BY id".format(timestamp_column)
     )
-    self.memory_entries = [command for command, in rows]
+    self.memory_entries = [HistoryEntry(command, submitted_at) for command, submitted_at in rows]
 
-  def _remember(self, text: str) -> None:
-    self.memory_entries.append(text)
+  def _remember(self, entry: HistoryEntry) -> None:
+    self.memory_entries.append(entry)
     if self.limit == 0:
       self.memory_entries = []
     elif self.limit > 0:
@@ -257,6 +299,8 @@ class EditorAction(Enum):
   RIGHT = auto()
   UP = auto()
   DOWN = auto()
+  PAGE_UP = auto()
+  PAGE_DOWN = auto()
   HOME = auto()
   END = auto()
   KILL_WORD = auto()
@@ -344,11 +388,11 @@ class TextBuffer:
 class HistorySearch:
   active: bool = False
   query: TextBuffer = field(default_factory=TextBuffer)
-  entries: List[str] = field(default_factory=list)
-  matches: List[str] = field(default_factory=list)
+  entries: List[HistoryEntry] = field(default_factory=list)
+  matches: List[HistoryEntry] = field(default_factory=list)
   selected: int = 0
 
-  def activate(self, entries: List[str]) -> None:
+  def activate(self, entries: List[HistoryEntry]) -> None:
     self.active = True
     self.query = TextBuffer()
     self.entries = entries
@@ -358,7 +402,7 @@ class HistorySearch:
     terms = self.query.text.casefold().split()
     self.matches = [
       entry for entry in self.entries
-      if all(term in entry.casefold() for term in terms)
+      if all(term in entry.command.casefold() for term in terms)
     ]
     self.selected = 0
 
@@ -368,7 +412,7 @@ class HistorySearch:
     elif event.action is EditorAction.SUBMIT:
       if self.matches:
         self.active = False
-        return self.matches[self.selected]
+        return self.matches[self.selected].command
     elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
       if self.matches:
         self.selected = max(0, self.selected - 1)
@@ -386,25 +430,32 @@ class HistorySearch:
 class DraftEditor:
 
   INPUT_SHORTCUTS = (
+    "Essential:",
+    "Ctrl+R: Search query history (enters history search mode)",
+    "Ctrl+Q: quit, discarding the draft",
+    "Draft:",
     "Enter: submit draft",
     "Ctrl+Enter / Ctrl+J: insert newline",
     "Ctrl+X Ctrl+E: open draft in $VISUAL/$EDITOR",
-    "Ctrl+Q: quit, discarding the draft",
-    "Ctrl+R: search history",
-    "Ctrl+P / Ctrl+N: older/newer history",
-    "Up/Down: draft lines, then history",
     "Ctrl+C: clear draft",
     "Ctrl+D: quit when the draft is empty",
+    "History navigation:",
+    "Ctrl+P / Ctrl+N: older/newer history",
+    "Up/Down: draft lines, then history",
+    "Help:",
     "?: shortcuts on an empty draft; F1: anytime",
   )
   SEARCH_SHORTCUTS = (
+    "Search and recall:",
     "Type: filter history (all terms, ignore case)",
+    "Enter: recall for editing, without executing",
     "Ctrl+N / Down: select next result",
     "Ctrl+P / Up: select previous result",
-    "Enter: recall for editing, without executing",
+    "Leave search:",
     "Esc: return to Input mode, restoring the draft",
     "Ctrl+C: return to Input mode, clearing the draft",
     "Ctrl+Q: quit, discarding the draft",
+    "Help:",
     "?: shortcuts on an empty query; F1: anytime",
   )
   EDITING_SHORTCUTS = (
@@ -439,6 +490,8 @@ class DraftEditor:
     self.search = HistorySearch()
     self.show_help = False
     self.help_scroll = 0
+    self.help_page_rows = 1
+    self.help_max_scroll = 0
     self.editor_prefix = False
 
   def read(self) -> Optional[str]:
@@ -469,6 +522,14 @@ class DraftEditor:
             self.help_scroll = max(0, self.help_scroll - 1)
           elif event.action in (EditorAction.DOWN, EditorAction.HISTORY_NEWER):
             self.help_scroll += 1
+          elif event.action is EditorAction.PAGE_UP:
+            self.help_scroll = max(0, self.help_scroll - self.help_page_rows)
+          elif event.action is EditorAction.PAGE_DOWN:
+            self.help_scroll += self.help_page_rows
+          elif event.action is EditorAction.HOME:
+            self.help_scroll = 0
+          elif event.action is EditorAction.END:
+            self.help_scroll = self.help_max_scroll
           self._render(force=event.action is EditorAction.REDRAW)
           continue
         active_buffer = self.search.query if self.search.active else self.draft
@@ -479,7 +540,7 @@ class DraftEditor:
           continue
         if event.action is EditorAction.SEARCH:
           if not self.search.active:
-            self.search.activate(self.history.entries())
+            self.search.activate(self.history.records())
           self._render()
           continue
         if self.search.active:
@@ -687,6 +748,8 @@ class DraftEditor:
       b"1~": EditorAction.HOME,
       b"3~": EditorAction.DELETE,
       b"4~": EditorAction.END,
+      b"5~": EditorAction.PAGE_UP,
+      b"6~": EditorAction.PAGE_DOWN,
       b"7~": EditorAction.HOME,
       b"8~": EditorAction.END,
       b"11~": EditorAction.HELP,
@@ -722,11 +785,11 @@ class DraftEditor:
         cursor_visual_row += local_row
       visual_lines.extend(wrapped)
 
-    shortcuts = self.SEARCH_SHORTCUTS if self.search.active else self.INPUT_SHORTCUTS
-    shortcuts += ("Text editing:",) + self.EDITING_SHORTCUTS
-    reserved_rows = 5 if self.search.active else 2
+    status = self._search_status(content_width) if self.search.active else self._status(len(lines), content_width)
+    reserved_rows = len(status) + (4 if self.search.active else 1)
     if self.show_help:
-      reserved_rows = min(len(shortcuts) + 3, max(2, terminal_size.lines - 1))
+      # A bounded preview keeps the draft visible and never grows while scrolling.
+      reserved_rows = min(14, max(2, terminal_size.lines - 1))
     draft_rows = max(1, terminal_size.lines - reserved_rows)
     first_visual_row = min(
       max(0, cursor_visual_row - draft_rows // 2),
@@ -743,16 +806,7 @@ class DraftEditor:
     else:
       output[0] = PROMPT_STYLE + prompt + RESET + output[0][len(prompt):]
     if self.show_help:
-      mode = "History search mode" if self.search.active else "Input mode"
-      output.append(PROMPT_STYLE + self._truncate("Shortcuts: " + mode, content_width) + RESET)
-      help_lines = []
-      for shortcut in shortcuts:
-        wrapped, _ = self._wrap_line(shortcut, content_width)
-        help_lines.extend(wrapped)
-      available = max(1, terminal_size.lines - len(output) - 1)
-      self.help_scroll = min(self.help_scroll, max(0, len(help_lines) - available))
-      output.extend(help_lines[self.help_scroll:self.help_scroll + available])
-      output.append(STATUS_STYLE + self._truncate(" ?/Esc close | Up/Down scroll ", content_width) + RESET)
+      self._render_help(output, content_width, min(reserved_rows, terminal_size.lines - len(output)))
     elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
       cursor_visual_row = len(output)
@@ -763,20 +817,62 @@ class DraftEditor:
         query_start += 1
       output.append(self._truncate(self.search.query.text[query_start:], content_width))
       if self.search.matches:
-        result_rows = max(1, min(6, terminal_size.lines - len(output) - 1))
+        result_rows = max(1, min(6, terminal_size.lines - len(output) - len(status)))
         start = max(0, self.search.selected - result_rows + 1)
         visible_matches = self.search.matches[start:start + result_rows]
         for index, match in enumerate(visible_matches, start):
           marker = "> " if index == self.search.selected else "  "
-          display = marker + match.replace("\n", " ↵ ")
-          output.append(self._truncate(display, content_width))
+          age_text = format_history_age(match.submitted_at)
+          if content_width < 40:
+            age_text = age_text.replace("just now", "now").replace("time unknown", "unknown")
+          age = "({})".format(age_text)
+          age = self._truncate(age, max(0, content_width - len(marker) - 2))
+          command_width = max(0, content_width - len(marker) - len(age) - 1)
+          command = self._truncate(match.command.replace("\n", " ↵ "), command_width)
+          padding = " " * max(1, command_width - self._text_width(command) + 1)
+          output.append(marker + command + padding + HISTORY_TIME_STYLE + age + RESET)
       else:
         output.append(self._truncate("(no matches)", content_width))
-      output.append(self._search_status(content_width) + RESET)
+      output.extend(status)
       cursor_column = self._text_width(query_prefix[query_start:])
     else:
-      output.append(self._status(len(lines), content_width) + RESET)
+      output.extend(status)
     self._draw(output, cursor_visual_row, cursor_column, columns, force)
+
+  def _render_help(self, output: List[str], width: int, height: int) -> None:
+    shortcuts = self.SEARCH_SHORTCUTS if self.search.active else self.INPUT_SHORTCUTS
+    shortcuts += ("Text editing:",) + self.EDITING_SHORTCUTS
+    help_lines = []
+    for shortcut in shortcuts:
+      wrapped, _ = self._wrap_line(shortcut, width)
+      for index, line in enumerate(wrapped):
+        if shortcut.endswith(":"):
+          line = PROMPT_STYLE + line + RESET
+        elif index == 0:
+          key, separator, description = line.partition(":")
+          line = HELP_KEY_STYLE + key + RESET + separator + description
+        help_lines.append(line)
+    available = max(1, height - 2)
+    self.help_page_rows = available
+    self.help_max_scroll = max(0, len(help_lines) - available)
+    self.help_scroll = min(self.help_scroll, self.help_max_scroll)
+    mode = "History search mode" if self.search.active else "Input mode"
+    position = "{}-{}/{}".format(
+      self.help_scroll + 1, min(len(help_lines), self.help_scroll + available), len(help_lines),
+    )
+    title = "Shortcuts: " + mode
+    if len(title) + len(position) + 1 > width:
+      title = "Search help" if self.search.active else "Input help"
+    title = self._truncate(title, max(0, width - len(position) - 1))
+    output.append(PROMPT_STYLE + title.ljust(max(0, width - len(position))) + position + RESET)
+    output.extend(help_lines[self.help_scroll:self.help_scroll + available])
+    if width >= 76:
+      footer = " ?/F1/Esc close | Up/Down scroll | PgUp/PgDn page | Home/End | Ctrl+Q quit "
+    elif width >= 50:
+      footer = " Esc close | Up/Down scroll | PgUp/PgDn | Ctrl+Q quit "
+    else:
+      footer = " Esc close | Up/Down scroll "
+    output.append(STATUS_STYLE + self._truncate(footer, width).ljust(width) + RESET)
 
   def _draw(
     self, lines: List[str], cursor_row: int, cursor_column: int, columns: int, force: bool,
@@ -874,33 +970,47 @@ class DraftEditor:
       column += cls._character_width(character, column)
     return column
 
-  def _search_status(self, width: int) -> str:
-    if self.history.mode is HistoryMode.MEMORY_ONLY:
-      text = MEMORY_ONLY_STATUS + "History search mode | ?/F1 shortcuts "
-    else:
-      text = "History search mode | ?/F1 shortcuts "
-    return STATUS_STYLE + text[:width].ljust(width)
+  def _search_status(self, width: int) -> List[str]:
+    return self._status_lines("History search mode", (
+      ("Ctrl+Q", " quit"), ("Enter", " recall" if width >= 26 else ""),
+    ), width, hints=(("Esc", " back"),))
 
-  def _status(self, line_count: int, width: int) -> str:
-    segments = []
+  def _status(self, line_count: int, width: int) -> List[str]:
+    return self._status_lines("Input mode", (
+      ("Ctrl+R", " history"), ("Ctrl+Q", " quit"),
+    ), width, " | {} lines".format(line_count))
+
+  def _status_lines(
+    self, mode: str, actions: Sequence[Tuple[str, str]], width: int, detail: str = "",
+    hints: Sequence[Tuple[str, str]] = (),
+  ) -> List[str]:
+    groups = [("", " " + mode if len(mode) < width else mode, True)]
+    groups.extend((key, label, True) for key, label in actions)
+    groups.extend((key, label, False) for key, label in (*hints, ("?", " shortcuts")))
+    lines = []
+    line = ""
+    used = 0
+    for key, label, required in groups:
+      length = len(key + label)
+      separator = " | " if used else ""
+      if used and used + len(separator) + length > width:
+        if not required:
+          continue
+        lines.append(line + STATUS_STYLE + " " * (width - used) + RESET)
+        line, used, separator = "", 0, ""
+      if length > width:
+        key = self._truncate(key, width)
+        label = self._truncate(label, width - len(key))
+        length = len(key + label)
+      line += STATUS_STYLE + separator + STATUS_KEY_STYLE + key + STATUS_STYLE + label
+      used += len(separator) + length
+    if used + len(detail) <= width:
+      line += STATUS_STYLE + detail
+      used += len(detail)
+    lines.append(line + STATUS_STYLE + " " * (width - used) + RESET)
     if self.history.mode is HistoryMode.MEMORY_ONLY:
-      segments.append((STATUS_STYLE, MEMORY_ONLY_STATUS))
-    segments.extend((
-      (STATUS_STYLE, " Input mode | "),
-      (STATUS_KEY_STYLE, "?"),
-      (STATUS_STYLE, " shortcuts | {} lines ".format(line_count)),
-    ))
-    remaining = width
-    output = []
-    for style, text in segments:
-      if not remaining:
-        break
-      visible = text[:remaining]
-      output.extend((style, visible))
-      remaining -= len(visible)
-    if remaining:
-      output.extend((STATUS_STYLE, " " * remaining))
-    return "".join(output)
+      lines.insert(0, STATUS_STYLE + self._truncate(MEMORY_ONLY_STATUS, width).ljust(width) + RESET)
+    return lines
 
   def _erase(self) -> None:
     output = self._erase_sequence()
