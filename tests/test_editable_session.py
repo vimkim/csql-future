@@ -23,6 +23,7 @@ from contextlib import closing
 import json
 import os
 from pathlib import Path
+import shlex
 import signal
 import sqlite3
 import sys
@@ -104,6 +105,10 @@ while True:
   print(text, flush=True)
   if text == ";exit":
     sys.exit(0)
+  if text == ";size":
+    size = os.get_terminal_size(0)
+    print("CSQL-SIZE={}x{}".format(size.lines, size.columns), flush=True)
+    continue
   if text == ";singleline off":
     automatic = False
     print("SINGLELINE IS OFF", flush=True)
@@ -196,6 +201,196 @@ finally:
     screen = AnsiScreen(rows=24, columns=100)
     screen.feed(bytes(session.output))
     return "\n".join(screen.display())
+
+  def configure_editor(self, body: str) -> Path:
+    editor = self.bin_directory / "draft editor.py"
+    editor.write_text(
+      "import json, os, sys, termios, tty\nfrom pathlib import Path\n"
+      "path = Path(sys.argv[-1])\n" + body,
+      encoding="utf-8",
+    )
+    self.environment.pop("VISUAL", None)
+    self.environment["EDITOR"] = shlex.join([sys.executable, str(editor)])
+    return editor
+
+  def test_external_editor_returns_editable_multiline_text_without_execution_or_history(self) -> None:
+    record = self.root / "editor-record.json"
+    self.environment["EDITOR_RECORD"] = str(record)
+    editor = self.configure_editor(
+      "attributes = termios.tcgetattr(0)\n"
+      "Path(os.environ['EDITOR_RECORD']).write_text(json.dumps({\n"
+      "  'text': path.read_text(), 'argv': sys.argv[1:-1], 'path': str(path),\n"
+      "  'tty': all(os.isatty(fd) for fd in (0, 1, 2)),\n"
+      "  'foreground': os.tcgetpgrp(0) == os.getpgrp(),\n"
+      "  'canonical': bool(attributes[3] & termios.ICANON),\n"
+      "  'echo': bool(attributes[3] & termios.ECHO)}))\n"
+      "input('DRAFT-EDITOR-READY> ')\n"
+      "path.write_text(\"select\\n'편집';\\n\", encoding='utf-8')\n"
+      "tty.setraw(0)\n"
+    )
+    self.environment["VISUAL"] = shlex.join([sys.executable, str(editor), "quoted flag"])
+    self.environment["EDITOR"] = "/missing/should-not-run"
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send("select\x0a'한글';\x02\x18".encode())
+    self.assertNotIn(b"DRAFT-EDITOR-READY", session.read_for(0.05))
+    session.send(b"\x05")
+    session.read_until(b"DRAFT-EDITOR-READY>")
+    captured = json.loads(record.read_text())
+    self.assertEqual("select\n'한글';\n", captured["text"])
+    self.assertEqual(["quoted flag"], captured["argv"])
+    for key in ("tty", "foreground", "canonical", "echo"):
+      self.assertTrue(captured[key], captured)
+    self.assertEqual([], self.stored_commands())
+    session.send(b"private-editor-keys\n")
+    returned = session.read_until(b"csql-with-history>") + session.read_for(0.05)
+    self.assertNotIn(b"EXECUTED", returned)
+    self.assertIn("'편집';", self.rendered_screen(session))
+    self.assertFalse(Path(captured["path"]).exists())
+    self.assertEqual([], self.stored_commands())
+    session.send(b"\x02!\r")
+    session.read_until(("EXECUTED=" + json.dumps(["select", "'편집'!;"])).encode())
+    session.read_until(b"csql-with-history>")
+    self.assertEqual(["select\n'편집'!;"], self.stored_commands())
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+    self.assertEqual(session.initial_attributes, session.terminal_attributes())
+
+  def test_external_editor_failures_preserve_draft_and_cursor(self) -> None:
+    cases = (
+      ("missing", "", "/no/such/editor", b"cannot edit draft"),
+      ("invalid command", "", "'unclosed", b"cannot edit draft"),
+      ("empty command", "", "   ", b"cannot edit draft"),
+      ("nonzero", "path.write_text('discard changes')\nsys.exit(7)\n", None, b"status 7"),
+      ("deleted file", "path.unlink()\n", None, b"cannot edit draft"),
+      ("invalid UTF-8", "path.write_bytes(b'\\xff')\n", None, b"cannot edit draft"),
+    )
+    for label, body, command, expected in cases:
+      with self.subTest(case=label):
+        self.configure_editor(body)
+        if command is not None:
+          self.environment["EDITOR"] = command
+        session = self.start()
+        session.read_until(b"csql-with-history>")
+        session.send(b"select 1;\x02\x18\x05")
+        session.read_until(expected)
+        session.read_until(b"csql-with-history>")
+        session.send(b"2\r")
+        session.read_until(b'EXECUTED=["select 12;"]')
+        session.read_until(b"csql-with-history>")
+        session.send(b"\x11")
+        self.assertEqual(0, session.wait())
+        self.assertEqual(session.initial_attributes, session.terminal_attributes())
+    self.assertEqual(["select 12;"] * len(cases), self.stored_commands())
+
+  def test_unchanged_external_edit_preserves_cursor_trailing_newlines_and_empty_draft(self) -> None:
+    self.configure_editor("print('UNCHANGED-EDITOR-RETURN', flush=True)\n")
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x18\x05")
+    session.read_until(b"UNCHANGED-EDITOR-RETURN")
+    session.read_until(b"csql-with-history>")
+    self.assertEqual([], self.stored_commands())
+    session.send(b"select 1;\x0a\x1b[A\x05\x02\x18\x05")
+    session.read_until(b"UNCHANGED-EDITOR-RETURN")
+    session.read_until(b"csql-with-history>")
+    session.send(b"2\r")
+    session.read_until(b'EXECUTED=["select 12;"]')
+    session.read_until(b"csql-with-history>")
+    self.assertEqual(["select 12;\n"], self.stored_commands())
+
+  def test_external_editor_defaults_to_vi_and_prefix_preserves_other_keys(self) -> None:
+    editor = self.configure_editor(
+      "print('DEFAULT-EDITOR-RETURN', flush=True)\n"
+      "path.write_text('select 81;\\n')\n"
+    )
+    vi = self.bin_directory / "vi"
+    vi.write_text("#!/usr/bin/env python3\n" + editor.read_text())
+    vi.chmod(0o755)
+    self.environment.pop("EDITOR")
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select 4\x182;\r")
+    session.read_until(b'EXECUTED=["select 42;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x18\x05")
+    session.read_until(b"DEFAULT-EDITOR-RETURN")
+    session.read_until(b"csql-with-history>")
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select 81;"]')
+    self.assertEqual(["select 42;", "select 81;"], self.stored_commands())
+
+  def test_resize_during_external_edit_restores_one_prompt_at_current_dimensions(self) -> None:
+    self.configure_editor(
+      "input('RESIZE-EDITOR-READY> ')\n"
+      "size = os.get_terminal_size(0)\n"
+      "print('EDITOR-SIZE={}x{}'.format(size.lines, size.columns), flush=True)\n"
+      "path.write_text('select ' + '7' * 70 + ';\\n')\n"
+    )
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    screen = AnsiScreen()
+    screen.feed(bytes(session.output))
+    session.send(b"\x18")
+    screen.feed(session.read_for(0.05))
+    session.set_size(12, 50)
+    screen.resize(12, 50)
+    session.send(b"\x05")
+    screen.feed(session.read_until(b"RESIZE-EDITOR-READY>"))
+    screen.feed(session.read_for(0.05))
+    session.set_size(8, 40)
+    screen.resize(8, 40)
+    session.send(b"\n")
+    screen.feed(session.read_until(b"EDITOR-SIZE=8x40"))
+    screen.feed(session.read_until(b"csql-with-history>"))
+    screen.feed(session.read_for(0.05))
+    self.assertEqual(1, sum("csql-with-history>" in line for line in screen.display()), screen.display())
+    self.assertEqual(1, sum("Input mode" in line for line in screen.display()), screen.display())
+    self.assertEqual([], self.stored_commands())
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select ' + b"7" * 70 + b';"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b";size\r")
+    session.read_until(b"CSQL-SIZE=8x40")
+
+  def test_interrupted_external_editor_keeps_draft_and_resumes_input(self) -> None:
+    self.configure_editor("input('INTERRUPT-EDITOR-READY> ')\n")
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select 42;\x18\x05")
+    session.read_until(b"INTERRUPT-EDITOR-READY>")
+    session.send(b"\x03")
+    session.read_until(b"draft kept")
+    session.read_until(b"csql-with-history>")
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select 42;"]')
+    self.assertEqual(["select 42;"], self.stored_commands())
+
+  def test_termination_during_external_edit_reaps_editor_and_csql(self) -> None:
+    editor_pid = self.root / "editor.pid"
+    csql_pid = self.root / "csql.pid"
+    record = self.root / "editor-path"
+    self.environment.update(EDITOR_PID=str(editor_pid), SYNTHETIC_PID_FILE=str(csql_pid),
+                            EDITOR_PATH=str(record))
+    self.configure_editor(
+      "Path(os.environ['EDITOR_PID']).write_text(str(os.getpid()))\n"
+      "Path(os.environ['EDITOR_PATH']).write_text(str(path))\n"
+      "input('TERMINATE-EDITOR-READY> ')\n"
+    )
+    for signum in (signal.SIGHUP, signal.SIGTERM):
+      with self.subTest(signal=signum):
+        session = self.start()
+        session.read_until(b"csql-with-history>")
+        session.send(b"unsaved\x18\x05")
+        session.read_until(b"TERMINATE-EDITOR-READY>")
+        os.kill(session.process_id, signum)
+        self.assertEqual(128 + signum, session.wait())
+        self.assertEqual(session.initial_attributes, session.terminal_attributes())
+        for path in (editor_pid, csql_pid):
+          self.assertTrue(wait_for_process_exit(int(path.read_text())))
+        self.assertFalse(Path(record.read_text()).exists())
+    self.assertEqual([], self.stored_commands())
 
   def test_ctrl_w_deletes_the_previous_word(self) -> None:
     session = self.start()
@@ -295,8 +490,9 @@ finally:
     session.send(b"?")
     session.read_for(0.05)
     help_screen = self.rendered_screen(session)
-    for key in ("Shortcuts", "Ctrl+Enter", "Ctrl+W", "Ctrl+Q", "Ctrl+N", "Ctrl+P"):
+    for key in ("Shortcuts: Input mode", "Ctrl+Enter", "Ctrl+X Ctrl+E", "Ctrl+W", "Ctrl+Q", "Ctrl+N", "Ctrl+P"):
       self.assertIn(key, help_screen)
+    self.assertNotIn("Enter: recall", help_screen)
     self.assertNotIn("csql-with-history> ?", help_screen)
     session.send(b"\x1b")
     session.read_for(0.1)
@@ -304,6 +500,39 @@ finally:
     session.send(b"select '?';\r")
     session.read_until(b"EXECUTED=[\"select '?';\"]")
     self.assertEqual(["select '?';"], self.stored_commands())
+
+  def test_search_help_preserves_query_selection_draft_and_cursor(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    for command in (b"select '?older';", b"select '?newer';"):
+      session.send(command + b"\r")
+      session.read_until(b"EXECUTED=")
+      session.read_until(b"csql-with-history>")
+    session.send(b"select 1;\x02\x12?")
+    session.read_for(0.05)
+    help_screen = self.rendered_screen(session)
+    self.assertIn("Shortcuts: History search mode", help_screen)
+    self.assertIn("Enter: recall for editing, without executing", help_screen)
+    self.assertIn("Esc: return to Input mode", help_screen)
+    self.assertNotIn("Enter: submit draft", help_screen)
+    self.assertNotIn("Ctrl+X Ctrl+E", help_screen)
+    session.send(b"?select '?\x0e\x1bOP")
+    session.read_for(0.05)
+    self.assertIn("Shortcuts: History search mode", self.rendered_screen(session))
+    session.send(b"\x1bOP")
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn("History search mode |", screen)
+    self.assertIn("select '?", screen)
+    self.assertIn("> select '?older';", screen)
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    session.send(b"2\x1b[11~")
+    session.read_for(0.05)
+    self.assertIn("Shortcuts: Input mode", self.rendered_screen(session))
+    session.send(b"\r\r")
+    session.read_until(b'EXECUTED=["select 12;"]')
+    self.assertEqual(["select '?older';", "select '?newer';", "select 12;"], self.stored_commands())
 
   def test_shortcuts_scroll_and_close_cleanly_in_a_small_terminal(self) -> None:
     session = self.start()
@@ -315,7 +544,7 @@ finally:
     session.read_for(0.05)
     screen = AnsiScreen(rows=7, columns=30)
     screen.feed(bytes(session.output))
-    self.assertTrue(any("Search: Enter recalls;" in line for line in screen.display()), screen.display())
+    self.assertTrue(any("Ctrl+L: redraw" in line for line in screen.display()), screen.display())
     session.send(b"?select 42;\r")
     session.read_until(b'EXECUTED=["select 42;"]')
     session.read_until(b"csql-with-history>")
@@ -323,7 +552,7 @@ finally:
     screen = AnsiScreen(rows=7, columns=30)
     screen.feed(bytes(session.output))
     self.assertEqual(1, sum("csql-with-history>" in line for line in screen.display()))
-    self.assertEqual(1, sum("SQL  draft" in line for line in screen.display()))
+    self.assertEqual(1, sum("Input mode" in line for line in screen.display()))
     self.assertFalse(any("Shortcuts" in line for line in screen.display()))
 
   def test_ctrl_q_discards_draft_quits_from_picker_and_help_and_restores_terminal(self) -> None:
@@ -366,7 +595,7 @@ finally:
     typed = session.read_for(0.05)
     self.assertIn(b"s", typed)
     self.assertNotIn(b"\x1b[2K", typed)
-    self.assertNotIn(b"SQL  draft", typed)
+    self.assertNotIn(b"Input mode", typed)
 
     session.send(b"\x1b[D")
     moved = session.read_for(0.05)
@@ -378,7 +607,7 @@ finally:
     session.send(b"\x0c")
     refreshed = session.read_for(0.05)
     self.assertIn(b"csql-with-history>", refreshed)
-    self.assertIn(b"SQL  draft", refreshed)
+    self.assertIn(b"Input mode", refreshed)
     session.send(b"\x12")
     session.read_for(0.05)
     session.send(b"\x0c")
@@ -401,13 +630,13 @@ finally:
     lines = screen.display()
     prompt_row = next(i for i, line in enumerate(lines) if "csql-with-history>" in line)
     self.assertEqual((prompt_row + 2, 1), (screen.row, screen.column))
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
 
     session.send(b"\x1b[H" + b"\x04" * 60)
     screen.feed(session.read_for(0.1))
     lines = screen.display()
     self.assertFalse(any("x" in line for line in lines), lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
     self.assertEqual((prompt_row, len("csql-with-history> ")), (screen.row, screen.column))
     session.send(b"select after_shrink;\r")
     session.read_until(b'EXECUTED=["select after_shrink;"]')
@@ -481,7 +710,7 @@ finally:
     session.send(b"draft\x12target")
     session.read_for(0.1)
     screen = self.rendered_screen(session)
-    overlay = screen.split("History search:", 1)[1].split("History |", 1)[0]
+    overlay = screen.split("History search:", 1)[1].split("History search mode |", 1)[0]
     self.assertEqual(1, overlay.count("select target_repeat;"), screen)
     self.assertEqual(1, overlay.count("select target_distinct;"), screen)
     selected = next(line for line in overlay.splitlines() if line.lstrip().startswith("> "))
@@ -554,7 +783,7 @@ finally:
 
     first.send(b"\x12newest_default")
     first.read_for(0.05)
-    overlay = self.rendered_screen(first).split("History search:", 1)[1].split("History |", 1)[0]
+    overlay = self.rendered_screen(first).split("History search:", 1)[1].split("History search mode |", 1)[0]
     self.assertEqual(1, overlay.count("select newest_default;"))
 
   def test_history_search_no_match_and_navigation_boundaries_never_submit_the_draft(self) -> None:
@@ -608,7 +837,7 @@ finally:
     picker_lines = picker.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in picker_lines), picker_lines)
     self.assertEqual(1, sum("History search:" in line for line in picker_lines), picker_lines)
-    self.assertEqual(1, sum("History |" in line for line in picker_lines), picker_lines)
+    self.assertEqual(1, sum("History search mode |" in line for line in picker_lines), picker_lines)
     self.assertTrue(any("> select 7;" in line for line in picker_lines), picker_lines)
 
     session.send(b"\x1b")
@@ -617,7 +846,7 @@ finally:
     editor.feed(bytes(session.output))
     editor_lines = editor.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in editor_lines), editor_lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in editor_lines), editor_lines)
+    self.assertEqual(1, sum("Input mode" in line for line in editor_lines), editor_lines)
     self.assertEqual(0, sum("History search:" in line for line in editor_lines), editor_lines)
     self.assertTrue(any('EXECUTED=["select 7;"]' in line for line in editor_lines), editor_lines)
 
@@ -647,7 +876,7 @@ finally:
     opened.feed(bytes(session.output))
     opened_lines = opened.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in opened_lines), opened_lines)
-    self.assertEqual(1, sum("History |" in line for line in opened_lines), opened_lines)
+    self.assertEqual(1, sum("History search mode |" in line for line in opened_lines), opened_lines)
 
     session.send(b"\x1b[B" * 7)
     session.read_for(0.1)
@@ -674,7 +903,7 @@ finally:
     picker.feed(bytes(session.output))
     picker_lines = picker.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in picker_lines), picker_lines)
-    self.assertEqual(1, sum("History |" in line for line in picker_lines), picker_lines)
+    self.assertEqual(1, sum("History search mode" in line for line in picker_lines), picker_lines)
     self.assertTrue(any("한글" in line for line in picker_lines), picker_lines)
 
     session.send(b"\x1b")
@@ -683,7 +912,7 @@ finally:
     editor.feed(bytes(session.output))
     editor_lines = editor.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in editor_lines), editor_lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in editor_lines), editor_lines)
+    self.assertEqual(1, sum("Input mode" in line for line in editor_lines), editor_lines)
 
   def test_submission_boundaries_duplicates_failed_commands_and_draft_restoration(self) -> None:
     session = self.start()
@@ -1190,7 +1419,7 @@ finally:
     screen.feed(bytes(session.output[handoff_returned:]))
     lines = screen.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
     self.assertIn("output_after_resized_handoff", "".join(lines))
 
   def test_separate_submissions_accumulate_for_xrun_and_errors_do_not_end_session(self) -> None:
@@ -1254,7 +1483,7 @@ finally:
     screen.feed(bytes(session.output))
     lines = screen.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
     self.assertTrue(any('EXECUTED=["select 14;"]' in line for line in lines), lines)
 
   def test_soft_wrapped_draft_has_one_rendered_prompt_and_status(self) -> None:
@@ -1268,7 +1497,7 @@ finally:
     screen.feed(bytes(session.output))
     lines = screen.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
 
     session.send(b"\x03select 20;\r")
     session.read_until(b'EXECUTED=["select 20;"]')
@@ -1288,10 +1517,10 @@ finally:
     screen.feed(resized)
     self.assertIn(b"csql-with-history>", resized)
     self.assertIn("한글".encode("utf-8"), resized)
-    self.assertIn(b"SQL  draft", resized)
+    self.assertIn(b"Input mode", resized)
     lines = screen.display()
     self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
-    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual(1, sum("Input mode" in line for line in lines), lines)
 
     session.send(b"\x03select after_resize;\r")
     session.read_until(b'EXECUTED=["select after_resize;"]')

@@ -103,7 +103,7 @@ class Session(TerminalSession):
     lines = self.update_screen()
     if sum("csql-with-history>" in line for line in lines) != 1:
       raise AssertionError("expected one rendered wrapper prompt: {}".format(lines))
-    if sum("SQL  draft" in line for line in lines) != 1:
+    if sum("Input mode" in line for line in lines) != 1:
       raise AssertionError("expected one rendered status bar: {}".format(lines))
     if not any(expected_output in line for line in lines):
       raise AssertionError("expected rendered output {!r}: {}".format(expected_output, lines))
@@ -151,7 +151,7 @@ def check_session(label: str, mode: str, database: str, environment: dict[str, s
     session.send(b"select sleep(1);\r")
     session.read_for(0.3)
     running_lines = session.update_screen()
-    if any("csql-with-history>" in line or "SQL  draft" in line for line in running_lines):
+    if any("csql-with-history>" in line or "Input mode" in line for line in running_lines):
       raise AssertionError("quiet running work returned to the wrapper editor early: {}".format(running_lines))
     session.expect("1 row selected", timeout=5.0)
     session.expect("csql-with-history>")
@@ -774,7 +774,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
     reader.read_for(0.2)
     search_lines = reader.update_screen()
     rendered_search = "\n".join(search_lines)
-    overlay = rendered_search.rsplit("History search:", 1)[-1].split("History |", 1)[0]
+    overlay = rendered_search.rsplit("History search:", 1)[-1].split("History search mode |", 1)[0]
     if overlay.count("select 55551;") != 1:
       raise AssertionError("repeated search result was not deduplicated: {}".format(search_lines))
     selected = next((line for line in overlay.splitlines() if line.lstrip().startswith("> ")), "")

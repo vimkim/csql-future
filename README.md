@@ -65,13 +65,31 @@ cursor movement leaves unchanged text and the status bar in place. Ctrl+L
 refreshes the editor. Layout follows the live terminal dimensions, including
 after a resize, even when exported `COLUMNS` or `LINES` values are stale.
 
-At the styled prompt:
+The editor starts in **Input mode**. Ctrl+R switches to **History search mode**;
+recalling a result or canceling the search returns to Input mode. The status bar
+names the active mode.
 
-- `?` on an empty draft opens the shortcut panel. `?`, Esc, or Enter closes it;
-  Up/Down or Ctrl+P/N scrolls it in a short terminal. Question marks inside SQL
-  drafts and history search queries remain ordinary text. The status bar keeps
-  a compact `? shortcuts` hint instead of listing every binding.
+In either mode, `?` in an empty input field opens that mode's shortcut panel.
+**F1** opens it at any time, including while editing a nonempty draft or search
+query. The panel separates the mode's actions from its text-editing shortcuts.
+`?`, F1, Esc, or Enter closes it; Up/Down or Ctrl+P/N scrolls it in a short
+terminal. Closing help preserves the draft, search query, selection, and cursor.
+Question marks in nonempty fields remain ordinary text.
+
+In Input mode:
+
 - Enter submits the entire draft.
+- **Ctrl+X Ctrl+E** opens the current draft in an external terminal editor.
+  Press Ctrl+X, then Ctrl+E. The wrapper uses `$VISUAL`, then `$EDITOR`, then
+  `vi`; for Neovim, set `EDITOR=nvim` (or `VISUAL=nvim` if `VISUAL` is already
+  set). Editor commands can contain arguments and quoted paths. The temporary
+  file has a `.sql` extension and includes the full multiline draft. Saving
+  and exiting restores its text for further editing; Enter is still required
+  to submit it. An unsuccessful editor exit or unreadable result keeps the
+  original draft. An unchanged file also preserves the cursor. The final file
+  newline is removed as an editor terminator; additional newlines are retained.
+  Editor keystrokes and unsent edits do not enter wrapper history. The file is
+  removed when the editor returns.
 - Ctrl+Enter inserts a newline without submitting; Ctrl+J also works. The
   editor accepts a terminal mapping to LF,
   [CSI-u](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) (`ESC [ 13 ; 5 u`),
@@ -91,16 +109,23 @@ At the styled prompt:
   start, and Ctrl+K cuts to its end (or joins the next line at a line ending).
   Ctrl+Y restores the last cut. Ctrl+T swaps adjacent characters. These editing
   bindings also work in the history search field.
-- Ctrl+R opens a temporary history search below the current draft. Search is
-  case-insensitive and every space-separated term must occur somewhere in the
-  complete command, including across embedded newlines. Ctrl+N/P or Down/Up
-  selects a result, Enter recalls it for editing without execution, and Esc
-  restores the draft and cursor from before the search.
-- Ctrl+C clears an idle draft. In the history picker it closes the picker and
-  clears the unfinished draft. Ctrl+D exits when the draft is empty. Ctrl+Q
-  exits from the editor, history picker, or shortcut panel, discarding the
-  unfinished draft without executing or saving it. While csql or a terminal
-  program owns input, keys continue to pass through to that program.
+- Ctrl+R opens history search below the current draft.
+- Ctrl+C clears the draft. Ctrl+D exits when the draft is empty.
+
+In History search mode:
+
+- Type to filter history. Search is case-insensitive and every space-separated
+  term must occur somewhere in the complete command, including across embedded
+  newlines.
+- Ctrl+N/P or Down/Up selects a result.
+- Enter recalls the selected result in Input mode for editing without execution.
+- Esc restores the draft and cursor from before the search.
+- Ctrl+C closes search and clears the unfinished draft.
+- The text-editing keys listed above also edit the search query.
+
+Ctrl+Q exits from either mode or its shortcut panel, discarding the unfinished
+draft without executing or saving it. While csql or a terminal program owns
+input, keys continue to pass through to that program.
 
 Each draft line is handed to csql unchanged as one physical csql input line.
 csql therefore remains responsible for SQL parsing, session commands, automatic
@@ -194,9 +219,12 @@ The enhanced editor then resumes in the same csql session; this is not an
 ordinary-csql fallback.
 
 Only text returned by the wrapper editor is a wrapper submission. Thus `;edit`
-may be retained, but text typed in the external editor, pager keystrokes, shell
+may be retained, but text typed in csql's native external editor, pager keystrokes, shell
 commands, and password responses are neither reconstructed nor saved as separate
 history entries.
+
+Ctrl+X Ctrl+E edits the wrapper's draft instead of csql's internal command buffer.
+Its returned text becomes a submission and history entry only after Enter.
 
 The wrapper propagates every live terminal resize to csql's private terminal.
 The enhanced editor redraws a long or multibyte draft immediately at the new
@@ -236,7 +264,9 @@ later ticket and is not claimed here.
 ## Verification
 
 The fast external-process suites use a synthetic csql executable, PTYs, an ANSI
-screen model, and isolated temporary directories:
+screen model, and isolated temporary directories. They cover mode-specific help,
+external draft editing, editor selection and quoted arguments, unsuccessful and
+interrupted edits, history isolation, resizing, and terminal/process cleanup:
 
 ```bash
 just test

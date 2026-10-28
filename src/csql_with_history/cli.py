@@ -26,11 +26,14 @@ import os
 from pathlib import Path
 import pty
 import select
+import shlex
 import shutil
 import signal
 import sqlite3
 import struct
+import subprocess
 import sys
+import tempfile
 import termios
 import time
 import tty
@@ -265,6 +268,8 @@ class EditorAction(Enum):
   HISTORY_NEWER = auto()
   REDRAW = auto()
   SEARCH = auto()
+  HELP = auto()
+  EXTERNAL_EDITOR = auto()
   CANCEL = auto()
   IGNORE = auto()
 
@@ -380,13 +385,29 @@ class HistorySearch:
 
 class DraftEditor:
 
-  SHORTCUTS = (
+  INPUT_SHORTCUTS = (
     "Enter: submit draft",
     "Ctrl+Enter / Ctrl+J: insert newline",
+    "Ctrl+X Ctrl+E: open draft in $VISUAL/$EDITOR",
     "Ctrl+Q: quit, discarding the draft",
     "Ctrl+R: search history",
     "Ctrl+P / Ctrl+N: older/newer history",
     "Up/Down: draft lines, then history",
+    "Ctrl+C: clear draft",
+    "Ctrl+D: quit when the draft is empty",
+    "?: shortcuts on an empty draft; F1: anytime",
+  )
+  SEARCH_SHORTCUTS = (
+    "Type: filter history (all terms, ignore case)",
+    "Ctrl+N / Down: select next result",
+    "Ctrl+P / Up: select previous result",
+    "Enter: recall for editing, without executing",
+    "Esc: return to Input mode, restoring the draft",
+    "Ctrl+C: return to Input mode, clearing the draft",
+    "Ctrl+Q: quit, discarding the draft",
+    "?: shortcuts on an empty query; F1: anytime",
+  )
+  EDITING_SHORTCUTS = (
     "Ctrl+A / Ctrl+E: line start/end",
     "Ctrl+B / Ctrl+F: character left/right",
     "Backspace / Ctrl+H: delete left",
@@ -395,10 +416,7 @@ class DraftEditor:
     "Ctrl+U / Ctrl+K: cut to line start/end",
     "Ctrl+Y: restore last cut",
     "Ctrl+T: swap adjacent characters",
-    "Ctrl+C: clear draft; Ctrl+L: redraw",
-    "Ctrl+D: quit when the draft is empty",
-    "Search: Ctrl+N/P or Down/Up select",
-    "Search: Enter recalls; Esc cancels",
+    "Ctrl+L: redraw",
   )
 
   def __init__(
@@ -421,6 +439,7 @@ class DraftEditor:
     self.search = HistorySearch()
     self.show_help = False
     self.help_scroll = 0
+    self.editor_prefix = False
 
   def read(self) -> Optional[str]:
     previous = termios.tcgetattr(0)
@@ -435,6 +454,7 @@ class DraftEditor:
       self.search = HistorySearch()
       self.show_help = False
       self.help_scroll = 0
+      self.editor_prefix = False
       self._render()
       while True:
         event = self._read_key()
@@ -442,7 +462,7 @@ class DraftEditor:
           return None
         if self.show_help:
           if event.action in (
-            EditorAction.CANCEL, EditorAction.SUBMIT, EditorAction.INTERRUPT,
+            EditorAction.CANCEL, EditorAction.SUBMIT, EditorAction.INTERRUPT, EditorAction.HELP,
           ) or event.text == "?":
             self.show_help = False
           elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
@@ -451,7 +471,8 @@ class DraftEditor:
             self.help_scroll += 1
           self._render(force=event.action is EditorAction.REDRAW)
           continue
-        if event.text == "?" and not self.draft.text and not self.search.active:
+        active_buffer = self.search.query if self.search.active else self.draft
+        if event.action is EditorAction.HELP or (event.text == "?" and not active_buffer.text):
           self.show_help = True
           self.help_scroll = 0
           self._render()
@@ -471,6 +492,10 @@ class DraftEditor:
             continue
           self._handle_search(event)
           self._render(force=event.action is EditorAction.REDRAW)
+          continue
+        if event.action is EditorAction.EXTERNAL_EDITOR:
+          self._edit_external(previous)
+          self._render(force=True)
           continue
         if event.action is EditorAction.SUBMIT:
           return self.draft.text
@@ -500,6 +525,33 @@ class DraftEditor:
     finally:
       self._erase()
       termios.tcsetattr(0, termios.TCSADRAIN, previous)
+
+  def _edit_external(self, terminal_attributes: List[object]) -> None:
+    self._erase()
+    termios.tcsetattr(0, termios.TCSADRAIN, terminal_attributes)
+    try:
+      command = shlex.split(os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi")
+      if not command:
+        raise ValueError("the editor command is empty")
+      with tempfile.TemporaryDirectory(prefix="csql-draft-") as directory:
+        path = Path(directory) / "draft.sql"
+        # The file's final newline is a terminator, not an extra draft line.
+        path.write_text(self.draft.text + "\n", encoding="utf-8")
+        returncode = run_terminal_editor([*command, str(path)])
+        if returncode:
+          print("csql-with-history: editor exited with status {}; draft kept".format(returncode),
+                file=sys.stderr, flush=True)
+          return
+        text = path.read_text(encoding="utf-8").removesuffix("\n")
+        if text != self.draft.text:
+          self.draft.text = text
+          self.draft.cursor = len(text)
+          self.history_index = None
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+      print("csql-with-history: cannot edit draft ({}); draft kept".format(error),
+            file=sys.stderr, flush=True)
+    finally:
+      tty.setraw(0)
 
   def _move_vertical(self, direction: int) -> None:
     lines = self.draft.text.split("\n")
@@ -553,6 +605,10 @@ class DraftEditor:
       if ready:
         break
     first = os.read(0, 1)
+    external_editor = self.editor_prefix and first == b"\x05"
+    self.editor_prefix = first == b"\x18"
+    if external_editor:
+      return KeyEvent(EditorAction.EXTERNAL_EDITOR)
     action = {
       b"\x01": EditorAction.HOME,
       b"\x02": EditorAction.LEFT,
@@ -604,6 +660,11 @@ class DraftEditor:
     second = os.read(0, 1)
     if second in (b"\r", b"\n"):
       return KeyEvent(EditorAction.NEWLINE)
+    if second == b"O":
+      ready, _, _ = select.select([0], [], [], 0.05)
+      if ready and os.read(0, 1) == b"P":
+        return KeyEvent(EditorAction.HELP)
+      return KeyEvent(EditorAction.IGNORE)
     if second != b"[":
       return KeyEvent(EditorAction.INSERT, second.decode("utf-8", errors="ignore"))
 
@@ -628,6 +689,8 @@ class DraftEditor:
       b"4~": EditorAction.END,
       b"7~": EditorAction.HOME,
       b"8~": EditorAction.END,
+      b"11~": EditorAction.HELP,
+      b"1;1P": EditorAction.HELP,
       b"13;5u": EditorAction.NEWLINE,
       b"27;5;13~": EditorAction.NEWLINE,
     }.get(bytes(sequence), EditorAction.IGNORE)
@@ -659,9 +722,11 @@ class DraftEditor:
         cursor_visual_row += local_row
       visual_lines.extend(wrapped)
 
+    shortcuts = self.SEARCH_SHORTCUTS if self.search.active else self.INPUT_SHORTCUTS
+    shortcuts += ("Text editing:",) + self.EDITING_SHORTCUTS
     reserved_rows = 5 if self.search.active else 2
     if self.show_help:
-      reserved_rows = min(len(self.SHORTCUTS) + 3, max(2, terminal_size.lines - 1))
+      reserved_rows = min(len(shortcuts) + 3, max(2, terminal_size.lines - 1))
     draft_rows = max(1, terminal_size.lines - reserved_rows)
     first_visual_row = min(
       max(0, cursor_visual_row - draft_rows // 2),
@@ -678,9 +743,10 @@ class DraftEditor:
     else:
       output[0] = PROMPT_STYLE + prompt + RESET + output[0][len(prompt):]
     if self.show_help:
-      output.append(PROMPT_STYLE + self._truncate("Shortcuts", content_width) + RESET)
+      mode = "History search mode" if self.search.active else "Input mode"
+      output.append(PROMPT_STYLE + self._truncate("Shortcuts: " + mode, content_width) + RESET)
       help_lines = []
-      for shortcut in self.SHORTCUTS:
+      for shortcut in shortcuts:
         wrapped, _ = self._wrap_line(shortcut, content_width)
         help_lines.extend(wrapped)
       available = max(1, terminal_size.lines - len(output) - 1)
@@ -810,9 +876,9 @@ class DraftEditor:
 
   def _search_status(self, width: int) -> str:
     if self.history.mode is HistoryMode.MEMORY_ONLY:
-      text = MEMORY_ONLY_STATUS + "Enter recall | Esc cancel | Ctrl+N/P select "
+      text = MEMORY_ONLY_STATUS + "History search mode | ?/F1 shortcuts "
     else:
-      text = " History | Ctrl+N/P select | Enter recall | Esc cancel "
+      text = "History search mode | ?/F1 shortcuts "
     return STATUS_STYLE + text[:width].ljust(width)
 
   def _status(self, line_count: int, width: int) -> str:
@@ -820,9 +886,9 @@ class DraftEditor:
     if self.history.mode is HistoryMode.MEMORY_ONLY:
       segments.append((STATUS_STYLE, MEMORY_ONLY_STATUS))
     segments.extend((
-      (STATUS_STYLE, " SQL  draft {} lines | ".format(line_count)),
+      (STATUS_STYLE, " Input mode | "),
       (STATUS_KEY_STYLE, "?"),
-      (STATUS_STYLE, " shortcuts "),
+      (STATUS_STYLE, " shortcuts | {} lines ".format(line_count)),
     ))
     remaining = width
     output = []
@@ -858,6 +924,45 @@ class DraftEditor:
     self.rendered_lines = []
     self.rendered_cursor_column = 0
     return "".join(output)
+
+
+def run_terminal_editor(command: Sequence[str]) -> int:
+  """Give an editor the foreground terminal and reap it before returning."""
+  previous_group = os.tcgetpgrp(0)
+  previous_attributes = termios.tcgetattr(0)
+  previous_ttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+  previous_int = signal.signal(signal.SIGINT, lambda _signum, _frame: None)
+  previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, TERMINATION_SIGNALS)
+  process: Optional[subprocess.Popen] = None
+
+  def prepare_child() -> None:
+    os.setpgrp()
+    os.tcsetpgrp(0, os.getpgrp())
+    signal.signal(signal.SIGTTOU, signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+  try:
+    process = subprocess.Popen(command, preexec_fn=prepare_child)
+    signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+    return process.wait()
+  finally:
+    try:
+      if process is not None and process.poll() is None:
+        try:
+          os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+          pass
+        try:
+          process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+          os.killpg(process.pid, signal.SIGKILL)
+          process.wait()
+    finally:
+      os.tcsetpgrp(0, previous_group)
+      termios.tcsetattr(0, termios.TCSADRAIN, previous_attributes)
+      signal.signal(signal.SIGINT, previous_int)
+      signal.signal(signal.SIGTTOU, previous_ttou)
+      signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 
 
 class CsqlTerminal:
@@ -1206,6 +1311,9 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
     editor = DraftEditor(history, terminal.consume_resize)
     while True:
       submission = editor.read()
+      # A foreground editor receives SIGWINCH itself. Refresh csql's private
+      # terminal before handing input back, including those intervening resizes.
+      terminal.resize()
       if submission is None:
         if not terminal.send_eof():
           break
@@ -1242,7 +1350,11 @@ Wrapper options:
   --version            Show the installed wrapper version
   --                   Forward remaining arguments to csql unchanged
 
-Keys: ? shortcuts, Ctrl+R search, Ctrl+Enter/Ctrl+J newline, Enter submit, Ctrl+Q quit.
+Input mode: ?/F1 shortcuts, Ctrl+R history search, Ctrl+X Ctrl+E external editor.
+History search mode: Ctrl+N/P selects, Enter recalls for editing, Esc restores the draft.
+Editor selection: $VISUAL, then $EDITOR, then vi. Save and exit to return to the draft.
+Enter submits. ? opens help in an empty field; F1 opens it at any time.
+Ctrl+Enter/Ctrl+J inserts a newline. Ctrl+Q quits from either mode or help.
 Other arguments pass through to csql. Run csql directly for its native usage.""")
     return 0
   if list(arguments) == ["--version"]:
