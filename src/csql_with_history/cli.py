@@ -324,6 +324,9 @@ class DraftEditor:
     self.cursor = 0
     self.rendered_rows = 0
     self.cursor_to_bottom = 0
+    self.rendered_lines: List[str] = []
+    self.rendered_columns = 0
+    self.rendered_cursor_column = 0
     self.history_entries: List[str] = []
     self.history_index: Optional[int] = None
     self.unfinished_text = ""
@@ -358,7 +361,7 @@ class DraftEditor:
             self._render()
             continue
           self._handle_search(event)
-          self._render()
+          self._render(force=event.action is EditorAction.REDRAW)
           continue
         if event.action is EditorAction.SUBMIT:
           return self.text
@@ -398,7 +401,7 @@ class DraftEditor:
           self.cursor = len(self.text) if end < 0 else end
         elif event.action is EditorAction.INSERT:
           self._insert(event.text)
-        self._render()
+        self._render(force=event.action is EditorAction.REDRAW)
     finally:
       self._erase()
       termios.tcsetattr(0, termios.TCSADRAIN, previous)
@@ -530,25 +533,29 @@ class DraftEditor:
     }.get(bytes(sequence), EditorAction.IGNORE)
     return KeyEvent(action)
 
-  def _render(self) -> None:
-    self._erase()
+  def _render(self, force: bool = False) -> None:
     lines = self.text.split("\n")
     before = self.text[:self.cursor]
     cursor_row = before.count("\n")
     cursor_offset = len(before.rsplit("\n", 1)[-1])
-    terminal_size = shutil.get_terminal_size((80, 24))
+    terminal_size = os.get_terminal_size(0)
     columns = max(2, terminal_size.columns)
     content_width = columns - 1
+    prompt = self._truncate("csql-with-history>", max(0, content_width - 1))
+    prefix = prompt + " "
+    prefix_width = len(prefix)
 
     visual_lines = []
     cursor_visual_row = 0
     cursor_column = 0
     for row, line in enumerate(lines):
-      wrapped, positions = self._wrap_line(line, content_width)
+      # Include the prompt in wrapping so the input cursor shares its first row.
+      displayed = prefix + line if row == 0 else line
+      wrapped, positions = self._wrap_line(displayed, content_width)
       if row < cursor_row:
         cursor_visual_row += len(wrapped)
       elif row == cursor_row:
-        local_row, cursor_column = positions[cursor_offset]
+        local_row, cursor_column = positions[cursor_offset + (prefix_width if row == 0 else 0)]
         cursor_visual_row += local_row
       visual_lines.extend(wrapped)
 
@@ -561,38 +568,73 @@ class DraftEditor:
     visible_visual_lines = visual_lines[first_visual_row:first_visual_row + draft_rows]
     cursor_visual_row -= first_visual_row
 
-    prompt = self._truncate("csql-with-history>", content_width)
-
-    output = [PROMPT_STYLE, prompt, RESET, "\033[K\r\n"]
-    for line in visible_visual_lines:
-      output.extend((line, "\033[K\r\n"))
-    extra_rows = 0
+    output = list(visible_visual_lines)
+    if first_visual_row:
+      # Keep the prompt visible when a tall draft scrolls past its first row.
+      output.insert(0, PROMPT_STYLE + prompt + RESET)
+      cursor_visual_row += 1
+    else:
+      output[0] = PROMPT_STYLE + prompt + RESET + output[0][len(prompt):]
     if self.search.active:
-      output.extend((PROMPT_STYLE, "History search:", RESET, "\033[K\r\n"))
-      output.extend((self._truncate(self.search.query, content_width), "\033[K\r\n"))
+      output.append(PROMPT_STYLE + "History search:" + RESET)
+      cursor_visual_row = len(output)
+      output.append(self._truncate(self.search.query, content_width))
       if self.search.matches:
-        result_rows = max(1, min(6, terminal_size.lines - len(visible_visual_lines) - 4))
+        result_rows = max(1, min(6, terminal_size.lines - len(output) - 1))
         start = max(0, self.search.selected - result_rows + 1)
         visible_matches = self.search.matches[start:start + result_rows]
         for index, match in enumerate(visible_matches, start):
           marker = "> " if index == self.search.selected else "  "
           display = marker + match.replace("\n", " ↵ ")
-          output.extend((self._truncate(display, content_width), "\033[K\r\n"))
+          output.append(self._truncate(display, content_width))
       else:
-        visible_matches = []
-        output.extend(("(no matches)", "\033[K\r\n"))
-      output.extend((self._search_status(content_width), RESET, "\033[K"))
-      extra_rows = 2 + max(1, len(visible_matches))
-      cursor_visual_row = len(visible_visual_lines) + 1
+        output.append(self._truncate("(no matches)", content_width))
+      output.append(self._search_status(content_width) + RESET)
       cursor_column = min(self._text_width(self.search.query), content_width)
     else:
-      output.extend((self._status(len(lines), content_width), RESET, "\033[K"))
-    self.cursor_to_bottom = len(visible_visual_lines) + extra_rows - cursor_visual_row
-    if self.cursor_to_bottom:
-      output.append("\033[{}A".format(self.cursor_to_bottom))
-    output.extend(("\r", "\033[{}C".format(cursor_column) if cursor_column else ""))
-    os.write(1, "".join(output).encode("utf-8"))
-    self.rendered_rows = len(visible_visual_lines) + extra_rows + 2
+      output.append(self._status(len(lines), content_width) + RESET)
+    self._draw(output, cursor_visual_row, cursor_column, columns, force)
+
+  def _draw(
+    self, lines: List[str], cursor_row: int, cursor_column: int, columns: int, force: bool,
+  ) -> None:
+    output = []
+    if self.rendered_rows and columns != self.rendered_columns:
+      output.append(self._erase_sequence())
+    row = self.rendered_rows - 1 - self.cursor_to_bottom if self.rendered_rows else 0
+    column = self.rendered_cursor_column
+
+    def move(target_row: int, target_column: int = 0) -> None:
+      nonlocal row, column
+      if target_row < row:
+        output.append("\033[{}A".format(row - target_row))
+      elif target_row > row:
+        # Newlines also allocate space when the editor grows at the screen bottom.
+        output.append("\r\n" * (target_row - row))
+      if target_row != row or target_column != column:
+        output.append("\r")
+        if target_column:
+          output.append("\033[{}C".format(target_column))
+      row, column = target_row, target_column
+
+    for index in range(max(len(lines), self.rendered_rows)):
+      line = lines[index] if index < len(lines) else ""
+      if not force and index < len(self.rendered_lines) and self.rendered_lines[index] == line:
+        continue
+      move(index)
+      output.extend((line, "\033[K"))
+      # Styles do not occupy columns; use carriage return before the next move.
+      output.append("\r")
+      column = 0
+    move(cursor_row, cursor_column)
+    if output:
+      # Never expose a separate blank frame between erasing and drawing.
+      os.write(1, "".join(output).encode("utf-8"))
+    self.rendered_lines = lines
+    self.rendered_columns = columns
+    self.rendered_rows = len(lines)
+    self.cursor_to_bottom = len(lines) - 1 - cursor_row
+    self.rendered_cursor_column = cursor_column
 
   @classmethod
   def _wrap_line(cls, line: str, width: int) -> Tuple[List[str], List[Tuple[int, int]]]:
@@ -686,8 +728,13 @@ class DraftEditor:
     return "".join(output)
 
   def _erase(self) -> None:
+    output = self._erase_sequence()
+    if output:
+      os.write(1, output.encode("ascii"))
+
+  def _erase_sequence(self) -> str:
     if not self.rendered_rows:
-      return
+      return ""
     output = []
     if self.cursor_to_bottom:
       output.append("\033[{}B".format(self.cursor_to_bottom))
@@ -697,9 +744,11 @@ class DraftEditor:
       if row + 1 < self.rendered_rows:
         output.append("\033[1A")
     output.append("\r")
-    os.write(1, "".join(output).encode("ascii"))
     self.rendered_rows = 0
     self.cursor_to_bottom = 0
+    self.rendered_lines = []
+    self.rendered_cursor_column = 0
+    return "".join(output)
 
 
 class CsqlTerminal:

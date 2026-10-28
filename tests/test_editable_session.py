@@ -196,6 +196,78 @@ finally:
     screen.feed(bytes(session.output))
     return "\n".join(screen.display())
 
+  def test_cursor_starts_after_prompt_and_tracks_inline_multiline_edits(self) -> None:
+    # Shell-exported dimensions must not override the live PTY geometry.
+    self.environment.update(COLUMNS="140", LINES="40")
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    screen = AnsiScreen()
+    screen.feed(bytes(session.output))
+    prompt_row = next(i for i, line in enumerate(screen.display()) if "csql-with-history>" in line)
+    self.assertEqual((prompt_row, len("csql-with-history> ")), (screen.row, screen.column))
+
+    session.send(b"select\x0a42;\x1b[A\x1b[H")
+    screen.feed(session.read_for(0.1))
+    self.assertIn("csql-with-history> select", screen.display()[prompt_row])
+    self.assertEqual((prompt_row, len("csql-with-history> ")), (screen.row, screen.column))
+    session.send(b"\x1b[B\x1b[F\r")
+    session.read_until(b'EXECUTED=["select", "42;"]')
+
+  def test_typing_and_navigation_do_not_erase_or_repaint_unchanged_rows(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    session.send(b"s")
+    typed = session.read_for(0.05)
+    self.assertIn(b"s", typed)
+    self.assertNotIn(b"\x1b[2K", typed)
+    self.assertNotIn(b"SQL  draft", typed)
+
+    session.send(b"\x1b[D")
+    moved = session.read_for(0.05)
+    self.assertNotIn(b"csql-with-history>", moved)
+    self.assertNotIn(b"\x1b[K", moved)
+    self.assertNotIn(b"\x1b[2K", moved)
+    session.send(b"\x1b[D\x7f\x01")
+    self.assertEqual(b"", session.read_for(0.05))
+    session.send(b"\x0c")
+    refreshed = session.read_for(0.05)
+    self.assertIn(b"csql-with-history>", refreshed)
+    self.assertIn(b"SQL  draft", refreshed)
+    session.send(b"\x12")
+    session.read_for(0.05)
+    session.send(b"\x0c")
+    self.assertIn(b"History search:", session.read_for(0.05))
+
+  def test_wrapping_and_shrinking_keep_cursor_and_status_aligned_at_screen_bottom(self) -> None:
+    session = self.start()
+    session.set_size(8, 40)
+    session.read_until(b"csql-with-history>")
+    for number in range(4):
+      session.send("select {};\r".format(number).encode("ascii"))
+      session.read_until('EXECUTED=["select {};"]'.format(number).encode("ascii"))
+      session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    screen = AnsiScreen(rows=8, columns=40)
+    screen.feed(bytes(session.output))
+
+    session.send(b"x" * 60)
+    screen.feed(session.read_for(0.1))
+    lines = screen.display()
+    prompt_row = next(i for i, line in enumerate(lines) if "csql-with-history>" in line)
+    self.assertEqual((prompt_row + 2, 1), (screen.row, screen.column))
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+
+    session.send(b"\x1b[H" + b"\x04" * 60)
+    screen.feed(session.read_for(0.1))
+    lines = screen.display()
+    self.assertFalse(any("x" in line for line in lines), lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertEqual((prompt_row, len("csql-with-history> ")), (screen.row, screen.column))
+    session.send(b"select after_shrink;\r")
+    session.read_until(b'EXECUTED=["select after_shrink;"]')
+
   def test_multiline_history_survives_restart_and_recall_is_editable(self) -> None:
     first = self.start()
     first.read_until(b"csql-with-history>")

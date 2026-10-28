@@ -59,6 +59,12 @@ stop all wrapper-option processing.
 
 ## Interactive input
 
+Input starts immediately after `csql-with-history> ` on the same line. The
+editor updates changed rows without clearing the display on each keypress;
+cursor movement leaves unchanged text and the status bar in place. Ctrl+L
+refreshes the editor. Layout follows the live terminal dimensions, including
+after a resize, even when exported `COLUMNS` or `LINES` values are stale.
+
 At the styled prompt:
 
 - Enter submits the entire draft.
