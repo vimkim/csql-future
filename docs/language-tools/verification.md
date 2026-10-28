@@ -70,3 +70,19 @@ Those are the other session's results, not fresh checks performed by this planni
 The 117-test results above belong to the planning branch's original `c292d00` baseline.
 The approved rebase must include the newer completion behavior and run proportionate combined checks.
 The contracts and snapshot ticket now preserve its added schema metadata.
+
+## Approved rebase verification
+
+The user approved the planning packet's integration and main push.
+The two planning commits rebased onto `99d49e1` without conflicts.
+Fresh combined checks passed all 130 tests in 45.692 seconds.
+The log is `/tmp/csql-language-plan-569-integration-tests.log`.
+
+The native experiment also passed all seven fixed expectations with the integrated completion module.
+Unfinished-input completion still returned `id` and `name`.
+The observed native library hash matches the original experiment.
+The new run is `/tmp/csql-language-plan-569-integration-native.json`.
+
+The eleven-ticket graph, blocking text, starter corpus, relative links, Markdown source, and instruction structural checks passed.
+The diff against the integration destination contains only `docs/language-tools` files.
+No production source or existing test changed in this planning packet.

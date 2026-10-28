@@ -25,16 +25,18 @@ Other 11.5 builds and CUBRID 11.4 require separate qualification.
 | Item | Value |
 | --- | --- |
 | Planning baseline | `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f` |
-| Task branch | `planning/language-tools` |
-| Task checkout | `/home/vimkim/gh/csql-future-project` |
+| Original task branch | `planning/language-tools` |
+| Original task checkout | `/home/vimkim/gh/csql-future-project` |
 | Merge destination | `main` in `/home/vimkim/gh/csql-future` |
+| Canonical packet location | `/home/vimkim/gh/csql-future/docs/language-tools` after integration |
 | Work record | `work-tracker show 569` |
 | Completion integration observed | Work 568 completed in main commit `99d49e13698b609ff4885a418578f7f50485e82f` |
 
 The primary checkout contained unrelated untracked legacy-package bytecode at inspection.
 Other sessions own their worktrees and may advance independently.
 The future coordinator must inspect live state before extracting completion code.
-The planning branch still has the original baseline until its approved rebase.
+The user approved this planning packet's rebase, main integration, and main push.
+The task branch was rebased onto completion integration commit `99d49e1` before combined verification.
 Ticket 01 must include the integrated completion commit in its actual dispatch baseline.
 
 ## Delivery boundary
@@ -43,5 +45,6 @@ This packet selects eleven bounded implementation tickets.
 Each ticket requires one new agent context and a separate worktree.
 No implementation ticket was executed in this planning session.
 Local planning commits are authorized.
-Merging this packet into `main` requires the user's approval.
+Approval covers this planning packet's integration only.
+Implementation integration requires its own concrete result and applicable approval.
 Publishing extensions, packages, issues, PRs, or deployment requires separate authorization.

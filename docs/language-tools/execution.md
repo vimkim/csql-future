@@ -58,7 +58,7 @@ Main includes its integration commit `99d49e13698b609ff4885a418578f7f50485e82f`.
 Its owner removed the completion worktree and branch after integration.
 Ticket 01 must check that its dispatch baseline includes that result or a verified successor.
 Preserve the expanded command contexts, vocabulary, catalog fields, and regression coverage.
-The current planning branch still starts at the earlier `c292d00` baseline until approved rebase.
+The planning packet was rebased onto `99d49e1` under the user's integration approval.
 Use independent ticket 02 if ticket 01's integration baseline remains unresolved.
 Record the checked baseline in the dispatch record.
 

@@ -51,7 +51,7 @@ It is not a complete syscall sandbox or an audit of all native grammar actions.
 
 ## Reproduce on this host
 
-Run from this task checkout:
+Run from the repository root:
 
 ```bash
 timeout 20s strace -f -e trace=network,execve,openat \
