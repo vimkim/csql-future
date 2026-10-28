@@ -67,19 +67,40 @@ after a resize, even when exported `COLUMNS` or `LINES` values are stale.
 
 At the styled prompt:
 
+- `?` on an empty draft opens the shortcut panel. `?`, Esc, or Enter closes it;
+  Up/Down or Ctrl+P/N scrolls it in a short terminal. Question marks inside SQL
+  drafts and history search queries remain ordinary text. The status bar keeps
+  a compact `? shortcuts` hint instead of listing every binding.
 - Enter submits the entire draft.
-- Ctrl+J inserts a newline without submitting; Alt+Enter does the same.
+- Ctrl+Enter inserts a newline without submitting; Ctrl+J also works. The
+  editor accepts a terminal mapping to LF,
+  [CSI-u](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) (`ESC [ 13 ; 5 u`),
+  or [xterm modifyOtherKeys](https://invisible-island.net/xterm/modified-keys.html)
+  (`ESC [ 27 ; 5 ; 13 ~`). A terminal that sends the same bytes
+  for Ctrl+Enter and Enter needs its own key mapping; Ctrl+J works without one.
+  Alt+Enter remains accepted for compatibility but is no longer advertised.
 - Left/Right move within the draft. Up/Down move between logical draft lines;
   at the first or last line they browse older/newer history. Moving newer than
   the latest entry restores the unfinished draft.
-- Home, End, Backspace, and Delete edit the recalled or unfinished draft.
+- Ctrl+P/N browse older/newer history directly, including from a multiline
+  draft, and restore the unfinished text and cursor when returning to it.
+- Ctrl+A/E (or Home/End) move to the logical line's start/end. Ctrl+B/F move
+  left/right by one character. Backspace or Ctrl+H deletes the character to the
+  left; Delete or Ctrl+D deletes the character at the cursor.
+- Ctrl+W cuts the previous whitespace-delimited word, Ctrl+U cuts to the line's
+  start, and Ctrl+K cuts to its end (or joins the next line at a line ending).
+  Ctrl+Y restores the last cut. Ctrl+T swaps adjacent characters. These editing
+  bindings also work in the history search field.
 - Ctrl+R opens a temporary history search below the current draft. Search is
   case-insensitive and every space-separated term must occur somewhere in the
-  complete command, including across embedded newlines. Up/Down selects a
-  result, Enter recalls it for editing without execution, and Esc restores the
-  draft and cursor from before the search.
+  complete command, including across embedded newlines. Ctrl+N/P or Down/Up
+  selects a result, Enter recalls it for editing without execution, and Esc
+  restores the draft and cursor from before the search.
 - Ctrl+C clears an idle draft. In the history picker it closes the picker and
-  clears the unfinished draft. Ctrl+D exits when the draft is empty.
+  clears the unfinished draft. Ctrl+D exits when the draft is empty. Ctrl+Q
+  exits from the editor, history picker, or shortcut panel, discarding the
+  unfinished draft without executing or saving it. While csql or a terminal
+  program owns input, keys continue to pass through to that program.
 
 Each draft line is handed to csql unchanged as one physical csql input line.
 csql therefore remains responsible for SQL parsing, session commands, automatic

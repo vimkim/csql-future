@@ -245,6 +245,7 @@ class EditorAction(Enum):
   INSERT = auto()
   SUBMIT = auto()
   EOF = auto()
+  QUIT = auto()
   INTERRUPT = auto()
   NEWLINE = auto()
   BACKSPACE = auto()
@@ -255,6 +256,13 @@ class EditorAction(Enum):
   DOWN = auto()
   HOME = auto()
   END = auto()
+  KILL_WORD = auto()
+  KILL_START = auto()
+  KILL_END = auto()
+  YANK = auto()
+  TRANSPOSE = auto()
+  HISTORY_OLDER = auto()
+  HISTORY_NEWER = auto()
   REDRAW = auto()
   SEARCH = auto()
   CANCEL = auto()
@@ -268,21 +276,81 @@ class KeyEvent:
 
 
 @dataclass
+class TextBuffer:
+  text: str = ""
+  cursor: int = 0
+  killed: str = ""
+
+  def insert(self, text: str) -> None:
+    self.text = self.text[:self.cursor] + text + self.text[self.cursor:]
+    self.cursor += len(text)
+
+  def handle(self, event: KeyEvent) -> None:
+    action = event.action
+    if action is EditorAction.INSERT:
+      self.insert(event.text)
+    elif action is EditorAction.NEWLINE:
+      self.insert("\n")
+    elif action is EditorAction.BACKSPACE:
+      if self.cursor:
+        self.text = self.text[:self.cursor - 1] + self.text[self.cursor:]
+        self.cursor -= 1
+    elif action in (EditorAction.DELETE, EditorAction.EOF):
+      self.text = self.text[:self.cursor] + self.text[self.cursor + 1:]
+    elif action is EditorAction.LEFT:
+      self.cursor = max(0, self.cursor - 1)
+    elif action is EditorAction.RIGHT:
+      self.cursor = min(len(self.text), self.cursor + 1)
+    elif action is EditorAction.HOME:
+      self.cursor = self.text.rfind("\n", 0, self.cursor) + 1
+    elif action is EditorAction.END:
+      end = self.text.find("\n", self.cursor)
+      self.cursor = len(self.text) if end < 0 else end
+    elif action is EditorAction.KILL_WORD:
+      start = self.cursor
+      while start and self.text[start - 1].isspace():
+        start -= 1
+      while start and not self.text[start - 1].isspace():
+        start -= 1
+      self._kill(start, self.cursor)
+    elif action is EditorAction.KILL_START:
+      self._kill(self.text.rfind("\n", 0, self.cursor) + 1, self.cursor)
+    elif action is EditorAction.KILL_END:
+      end = self.text.find("\n", self.cursor)
+      if end == self.cursor:
+        end += 1
+      self._kill(self.cursor, len(self.text) if end < 0 else end)
+    elif action is EditorAction.YANK:
+      self.insert(self.killed)
+    elif action is EditorAction.TRANSPOSE and self.cursor:
+      end = min(len(self.text), self.cursor + 1)
+      if end >= 2 and "\n" not in self.text[end - 2:end]:
+        self.text = self.text[:end - 2] + self.text[end - 1] + self.text[end - 2] + self.text[end:]
+        self.cursor = end
+
+  def _kill(self, start: int, end: int) -> None:
+    if start < end:
+      self.killed = self.text[start:end]
+      self.text = self.text[:start] + self.text[end:]
+      self.cursor = start
+
+
+@dataclass
 class HistorySearch:
   active: bool = False
-  query: str = ""
+  query: TextBuffer = field(default_factory=TextBuffer)
   entries: List[str] = field(default_factory=list)
   matches: List[str] = field(default_factory=list)
   selected: int = 0
 
   def activate(self, entries: List[str]) -> None:
     self.active = True
-    self.query = ""
+    self.query = TextBuffer()
     self.entries = entries
     self.update_matches()
 
   def update_matches(self) -> None:
-    terms = self.query.casefold().split()
+    terms = self.query.text.casefold().split()
     self.matches = [
       entry for entry in self.entries
       if all(term in entry.casefold() for term in terms)
@@ -296,22 +364,42 @@ class HistorySearch:
       if self.matches:
         self.active = False
         return self.matches[self.selected]
-    elif event.action is EditorAction.UP:
+    elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
       if self.matches:
         self.selected = max(0, self.selected - 1)
-    elif event.action is EditorAction.DOWN:
+    elif event.action in (EditorAction.DOWN, EditorAction.HISTORY_NEWER):
       if self.matches:
         self.selected = min(len(self.matches) - 1, self.selected + 1)
-    elif event.action is EditorAction.BACKSPACE:
-      self.query = self.query[:-1]
-      self.update_matches()
-    elif event.action is EditorAction.INSERT:
-      self.query += event.text
-      self.update_matches()
+    elif event.action is not EditorAction.NEWLINE:
+      previous = self.query.text
+      self.query.handle(event)
+      if self.query.text != previous:
+        self.update_matches()
     return None
 
 
 class DraftEditor:
+
+  SHORTCUTS = (
+    "Enter: submit draft",
+    "Ctrl+Enter / Ctrl+J: insert newline",
+    "Ctrl+Q: quit, discarding the draft",
+    "Ctrl+R: search history",
+    "Ctrl+P / Ctrl+N: older/newer history",
+    "Up/Down: draft lines, then history",
+    "Ctrl+A / Ctrl+E: line start/end",
+    "Ctrl+B / Ctrl+F: character left/right",
+    "Backspace / Ctrl+H: delete left",
+    "Delete / Ctrl+D: delete at cursor",
+    "Ctrl+W: cut previous word",
+    "Ctrl+U / Ctrl+K: cut to line start/end",
+    "Ctrl+Y: restore last cut",
+    "Ctrl+T: swap adjacent characters",
+    "Ctrl+C: clear draft; Ctrl+L: redraw",
+    "Ctrl+D: quit when the draft is empty",
+    "Search: Ctrl+N/P or Down/Up select",
+    "Search: Enter recalls; Esc cancels",
+  )
 
   def __init__(
     self,
@@ -320,8 +408,7 @@ class DraftEditor:
   ) -> None:
     self.history = history
     self.consume_resize = consume_resize
-    self.text = ""
-    self.cursor = 0
+    self.draft = TextBuffer()
     self.rendered_rows = 0
     self.cursor_to_bottom = 0
     self.rendered_lines: List[str] = []
@@ -332,21 +419,43 @@ class DraftEditor:
     self.unfinished_text = ""
     self.unfinished_cursor = 0
     self.search = HistorySearch()
+    self.show_help = False
+    self.help_scroll = 0
 
   def read(self) -> Optional[str]:
     previous = termios.tcgetattr(0)
     tty.setraw(0)
     try:
-      self.text = ""
-      self.cursor = 0
+      self.draft.text = ""
+      self.draft.cursor = 0
       self.history_entries = []
       self.history_index = None
       self.unfinished_text = ""
       self.unfinished_cursor = 0
       self.search = HistorySearch()
+      self.show_help = False
+      self.help_scroll = 0
       self._render()
       while True:
         event = self._read_key()
+        if event.action is EditorAction.QUIT:
+          return None
+        if self.show_help:
+          if event.action in (
+            EditorAction.CANCEL, EditorAction.SUBMIT, EditorAction.INTERRUPT,
+          ) or event.text == "?":
+            self.show_help = False
+          elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
+            self.help_scroll = max(0, self.help_scroll - 1)
+          elif event.action in (EditorAction.DOWN, EditorAction.HISTORY_NEWER):
+            self.help_scroll += 1
+          self._render(force=event.action is EditorAction.REDRAW)
+          continue
+        if event.text == "?" and not self.draft.text and not self.search.active:
+          self.show_help = True
+          self.help_scroll = 0
+          self._render()
+          continue
         if event.action is EditorAction.SEARCH:
           if not self.search.active:
             self.search.activate(self.history.entries())
@@ -355,8 +464,8 @@ class DraftEditor:
         if self.search.active:
           if event.action is EditorAction.INTERRUPT:
             self.search.active = False
-            self.text = ""
-            self.cursor = 0
+            self.draft.text = ""
+            self.draft.cursor = 0
             self.history_index = None
             self._render()
             continue
@@ -364,71 +473,49 @@ class DraftEditor:
           self._render(force=event.action is EditorAction.REDRAW)
           continue
         if event.action is EditorAction.SUBMIT:
-          return self.text
+          return self.draft.text
         if event.action is EditorAction.EOF:
-          if not self.text:
+          if not self.draft.text:
             return None
-          self._delete()
-        elif event.action is EditorAction.INTERRUPT:
-          self.text = ""
-          self.cursor = 0
-        elif event.action is EditorAction.NEWLINE:
-          self._insert("\n")
-        elif event.action is EditorAction.BACKSPACE:
-          if self.cursor:
-            self.text = self.text[:self.cursor - 1] + self.text[self.cursor:]
-            self.cursor -= 1
-        elif event.action is EditorAction.DELETE:
-          self._delete()
-        elif event.action is EditorAction.LEFT:
-          self.cursor = max(0, self.cursor - 1)
-        elif event.action is EditorAction.RIGHT:
-          self.cursor = min(len(self.text), self.cursor + 1)
+        if event.action is EditorAction.INTERRUPT:
+          self.draft.text = ""
+          self.draft.cursor = 0
         elif event.action is EditorAction.UP:
-          if self.text[:self.cursor].count("\n"):
+          if self.draft.text[:self.draft.cursor].count("\n"):
             self._move_vertical(-1)
           else:
             self._browse_older()
         elif event.action is EditorAction.DOWN:
-          if self.text[:self.cursor].count("\n") < self.text.count("\n"):
+          if self.draft.text[:self.draft.cursor].count("\n") < self.draft.text.count("\n"):
             self._move_vertical(1)
           else:
             self._browse_newer()
-        elif event.action is EditorAction.HOME:
-          self.cursor = self.text.rfind("\n", 0, self.cursor) + 1
-        elif event.action is EditorAction.END:
-          end = self.text.find("\n", self.cursor)
-          self.cursor = len(self.text) if end < 0 else end
-        elif event.action is EditorAction.INSERT:
-          self._insert(event.text)
+        elif event.action is EditorAction.HISTORY_OLDER:
+          self._browse_older()
+        elif event.action is EditorAction.HISTORY_NEWER:
+          self._browse_newer()
+        else:
+          self.draft.handle(event)
         self._render(force=event.action is EditorAction.REDRAW)
     finally:
       self._erase()
       termios.tcsetattr(0, termios.TCSADRAIN, previous)
 
-  def _delete(self) -> None:
-    if self.cursor < len(self.text):
-      self.text = self.text[:self.cursor] + self.text[self.cursor + 1:]
-
-  def _insert(self, text: str) -> None:
-    self.text = self.text[:self.cursor] + text + self.text[self.cursor:]
-    self.cursor += len(text)
-
   def _move_vertical(self, direction: int) -> None:
-    lines = self.text.split("\n")
-    before = self.text[:self.cursor]
+    lines = self.draft.text.split("\n")
+    before = self.draft.text[:self.draft.cursor]
     row = before.count("\n")
     column = len(before.rsplit("\n", 1)[-1])
     target = row + direction
     if target < 0 or target >= len(lines):
       return
-    self.cursor = sum(len(line) + 1 for line in lines[:target]) + min(column, len(lines[target]))
+    self.draft.cursor = sum(len(line) + 1 for line in lines[:target]) + min(column, len(lines[target]))
 
   def _handle_search(self, event: KeyEvent) -> None:
     recalled = self.search.handle(event)
     if recalled is not None:
-      self.text = recalled
-      self.cursor = 0
+      self.draft.text = recalled
+      self.draft.cursor = 0
       self.history_index = None
 
   def _browse_older(self) -> None:
@@ -436,27 +523,27 @@ class DraftEditor:
       self.history_entries = self.history.entries()
       if not self.history_entries:
         return
-      self.unfinished_text = self.text
-      self.unfinished_cursor = self.cursor
+      self.unfinished_text = self.draft.text
+      self.unfinished_cursor = self.draft.cursor
       self.history_index = 0
     elif self.history_index + 1 < len(self.history_entries):
       self.history_index += 1
     else:
       return
-    self.text = self.history_entries[self.history_index]
-    self.cursor = 0
+    self.draft.text = self.history_entries[self.history_index]
+    self.draft.cursor = 0
 
   def _browse_newer(self) -> None:
     if self.history_index is None:
       return
     if self.history_index:
       self.history_index -= 1
-      self.text = self.history_entries[self.history_index]
-      self.cursor = len(self.text)
+      self.draft.text = self.history_entries[self.history_index]
+      self.draft.cursor = len(self.draft.text)
     else:
       self.history_index = None
-      self.text = self.unfinished_text
-      self.cursor = self.unfinished_cursor
+      self.draft.text = self.unfinished_text
+      self.draft.cursor = self.unfinished_cursor
 
   def _read_key(self) -> KeyEvent:
     while True:
@@ -466,22 +553,32 @@ class DraftEditor:
       if ready:
         break
     first = os.read(0, 1)
-    if first == b"\r":
-      return KeyEvent(EditorAction.SUBMIT)
-    if first == b"\n":
-      return KeyEvent(EditorAction.NEWLINE)
-    if first == b"\x03":
-      return KeyEvent(EditorAction.INTERRUPT)
-    if first == b"\x04":
-      return KeyEvent(EditorAction.EOF)
-    if first in (b"\x08", b"\x7f"):
-      return KeyEvent(EditorAction.BACKSPACE)
+    action = {
+      b"\x01": EditorAction.HOME,
+      b"\x02": EditorAction.LEFT,
+      b"\x03": EditorAction.INTERRUPT,
+      b"\x04": EditorAction.EOF,
+      b"\x05": EditorAction.END,
+      b"\x06": EditorAction.RIGHT,
+      b"\x08": EditorAction.BACKSPACE,
+      b"\x0a": EditorAction.NEWLINE,
+      b"\x0b": EditorAction.KILL_END,
+      b"\x0c": EditorAction.REDRAW,
+      b"\x0d": EditorAction.SUBMIT,
+      b"\x0e": EditorAction.HISTORY_NEWER,
+      b"\x10": EditorAction.HISTORY_OLDER,
+      b"\x11": EditorAction.QUIT,
+      b"\x12": EditorAction.SEARCH,
+      b"\x14": EditorAction.TRANSPOSE,
+      b"\x15": EditorAction.KILL_START,
+      b"\x17": EditorAction.KILL_WORD,
+      b"\x19": EditorAction.YANK,
+      b"\x7f": EditorAction.BACKSPACE,
+    }.get(first)
+    if action is not None:
+      return KeyEvent(action)
     if first == b"\x09":
       return KeyEvent(EditorAction.INSERT, "\t")
-    if first == b"\x0c":
-      return KeyEvent(EditorAction.REDRAW)
-    if first == b"\x12":
-      return KeyEvent(EditorAction.SEARCH)
     if first == b"\x1b":
       return self._read_escape()
     if first < b"\x20":
@@ -511,12 +608,13 @@ class DraftEditor:
       return KeyEvent(EditorAction.INSERT, second.decode("utf-8", errors="ignore"))
 
     sequence = bytearray()
-    while len(sequence) < 8:
+    while len(sequence) < 32:
       ready, _, _ = select.select([0], [], [], 0.01)
       if not ready:
         break
       sequence.extend(os.read(0, 1))
-      if sequence[-1:] in b"~ABCDHF":
+      # Every CSI sequence ends at a byte in this range, including CSI-u.
+      if 0x40 <= sequence[-1] <= 0x7e:
         break
     action = {
       b"A": EditorAction.UP,
@@ -530,12 +628,14 @@ class DraftEditor:
       b"4~": EditorAction.END,
       b"7~": EditorAction.HOME,
       b"8~": EditorAction.END,
+      b"13;5u": EditorAction.NEWLINE,
+      b"27;5;13~": EditorAction.NEWLINE,
     }.get(bytes(sequence), EditorAction.IGNORE)
     return KeyEvent(action)
 
   def _render(self, force: bool = False) -> None:
-    lines = self.text.split("\n")
-    before = self.text[:self.cursor]
+    lines = self.draft.text.split("\n")
+    before = self.draft.text[:self.draft.cursor]
     cursor_row = before.count("\n")
     cursor_offset = len(before.rsplit("\n", 1)[-1])
     terminal_size = os.get_terminal_size(0)
@@ -560,6 +660,8 @@ class DraftEditor:
       visual_lines.extend(wrapped)
 
     reserved_rows = 5 if self.search.active else 2
+    if self.show_help:
+      reserved_rows = min(len(self.SHORTCUTS) + 3, max(2, terminal_size.lines - 1))
     draft_rows = max(1, terminal_size.lines - reserved_rows)
     first_visual_row = min(
       max(0, cursor_visual_row - draft_rows // 2),
@@ -575,10 +677,25 @@ class DraftEditor:
       cursor_visual_row += 1
     else:
       output[0] = PROMPT_STYLE + prompt + RESET + output[0][len(prompt):]
-    if self.search.active:
+    if self.show_help:
+      output.append(PROMPT_STYLE + self._truncate("Shortcuts", content_width) + RESET)
+      help_lines = []
+      for shortcut in self.SHORTCUTS:
+        wrapped, _ = self._wrap_line(shortcut, content_width)
+        help_lines.extend(wrapped)
+      available = max(1, terminal_size.lines - len(output) - 1)
+      self.help_scroll = min(self.help_scroll, max(0, len(help_lines) - available))
+      output.extend(help_lines[self.help_scroll:self.help_scroll + available])
+      output.append(STATUS_STYLE + self._truncate(" ?/Esc close | Up/Down scroll ", content_width) + RESET)
+    elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
       cursor_visual_row = len(output)
-      output.append(self._truncate(self.search.query, content_width))
+      query_prefix = self.search.query.text[:self.search.query.cursor]
+      # Keep the insertion point visible when a search is wider than the terminal.
+      query_start = 0
+      while self._text_width(query_prefix[query_start:]) > content_width:
+        query_start += 1
+      output.append(self._truncate(self.search.query.text[query_start:], content_width))
       if self.search.matches:
         result_rows = max(1, min(6, terminal_size.lines - len(output) - 1))
         start = max(0, self.search.selected - result_rows + 1)
@@ -590,7 +707,7 @@ class DraftEditor:
       else:
         output.append(self._truncate("(no matches)", content_width))
       output.append(self._search_status(content_width) + RESET)
-      cursor_column = min(self._text_width(self.search.query), content_width)
+      cursor_column = self._text_width(query_prefix[query_start:])
     else:
       output.append(self._status(len(lines), content_width) + RESET)
     self._draw(output, cursor_visual_row, cursor_column, columns, force)
@@ -693,9 +810,9 @@ class DraftEditor:
 
   def _search_status(self, width: int) -> str:
     if self.history.mode is HistoryMode.MEMORY_ONLY:
-      text = MEMORY_ONLY_STATUS + "Enter recall | Esc cancel | Up/Down select "
+      text = MEMORY_ONLY_STATUS + "Enter recall | Esc cancel | Ctrl+N/P select "
     else:
-      text = " History | Enter recall | Esc cancel | Up/Down select "
+      text = " History | Ctrl+N/P select | Enter recall | Esc cancel "
     return STATUS_STYLE + text[:width].ljust(width)
 
   def _status(self, line_count: int, width: int) -> str:
@@ -704,16 +821,8 @@ class DraftEditor:
       segments.append((STATUS_STYLE, MEMORY_ONLY_STATUS))
     segments.extend((
       (STATUS_STYLE, " SQL  draft {} lines | ".format(line_count)),
-      (STATUS_KEY_STYLE, "Enter"),
-      (STATUS_STYLE, " submit "),
-      (STATUS_KEY_STYLE, "Ctrl+J"),
-      (STATUS_STYLE, " newline "),
-      (STATUS_KEY_STYLE, "Alt+Enter"),
-      (STATUS_STYLE, " newline "),
-      (STATUS_KEY_STYLE, "Ctrl+R"),
-      (STATUS_STYLE, " search "),
-      (STATUS_KEY_STYLE, "Ctrl+C"),
-      (STATUS_STYLE, " clear "),
+      (STATUS_KEY_STYLE, "?"),
+      (STATUS_STYLE, " shortcuts "),
     ))
     remaining = width
     output = []
@@ -1133,7 +1242,7 @@ Wrapper options:
   --version            Show the installed wrapper version
   --                   Forward remaining arguments to csql unchanged
 
-Keys: Up/Down recall, Ctrl+R search, Ctrl+J newline, Enter submit.
+Keys: ? shortcuts, Ctrl+R search, Ctrl+Enter/Ctrl+J newline, Enter submit, Ctrl+Q quit.
 Other arguments pass through to csql. Run csql directly for its native usage.""")
     return 0
   if list(arguments) == ["--version"]:

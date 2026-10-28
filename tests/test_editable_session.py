@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+import json
 import os
 from pathlib import Path
 import signal
@@ -195,6 +196,149 @@ finally:
     screen = AnsiScreen(rows=24, columns=100)
     screen.feed(bytes(session.output))
     return "\n".join(screen.display())
+
+  def test_ctrl_w_deletes_the_previous_word(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select wrong\x17right;\r")
+    session.read_until(b'EXECUTED=["select right;"]')
+    self.assertEqual(["select right;"], self.stored_commands())
+
+  def test_unix_editing_keys_preserve_the_draft_around_the_cursor(self) -> None:
+    cases = (
+      (b"select 12;\x01\x06\x06\x05\x02\x02\x04\r", "select 1;"),
+      (b"select 12;\x08\x7f;\r", "select 1;"),
+      (b"select wrong   \x17right;\r", "select right;"),
+      (b"wrong tail;\x01\x06\x06\x06\x06\x06\x15select\x05\r", "select tail;"),
+      (b"select wrong;\x01\x06\x06\x06\x06\x06\x06\x06\x0b42;\r", "select 42;"),
+      (b"select 42;\x17\x19\r", "select 42;"),
+      (b"seletc\x14 42;\r", "select 42;"),
+      ("select 한글".encode() + b"\x08;\r", "select 한;"),
+    )
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    for keys, expected in cases:
+      with self.subTest(keys=keys):
+        session.send(keys)
+        # Synthetic csql uses json.dumps' default ASCII escaping for Unicode.
+        session.read_until(("EXECUTED=" + json.dumps([expected])).encode())
+        session.read_until(b"csql-with-history>")
+
+    session.send(b"select\x0awrong\x15right;\r")
+    session.read_until(b'EXECUTED=["select", "right;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"select\x0awrong\x01\x0b42;\r")
+    session.read_until(b'EXECUTED=["select", "42;"]')
+
+  def test_ctrl_enter_encodings_insert_newlines_without_consuming_following_text(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    for newline in (b"\n", b"\x1b[13;5u", b"\x1b[27;5;13~"):
+      with self.subTest(newline=newline):
+        session.send(b"select" + newline + b"42;\r")
+        session.read_until(b'EXECUTED=["select", "42;"]')
+        session.read_until(b"csql-with-history>")
+    self.assertEqual(["select\n42;"] * 3, self.stored_commands())
+
+  def test_ctrl_n_and_ctrl_p_select_history_and_restore_a_multiline_draft(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    for command in (b"select older;", b"select newer;"):
+      session.send(command + b"\r")
+      session.read_until(b'EXECUTED=["' + command + b'"]')
+      session.read_until(b"csql-with-history>")
+    session.send(b"select\x0adraft;\x02\x10\x10\x0e\x0e!\r")
+    session.read_until(b'EXECUTED=["select", "draft!;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"unfinished\x12select\x0e\x0e\x10\r")
+    recalled = session.read_for(0.05)
+    self.assertNotIn(b"EXECUTED", recalled)
+    self.assertNotIn("History search:", self.rendered_screen(session))
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select newer;"]')
+
+  def test_unix_editing_keys_work_in_the_history_query(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select target;\r")
+    session.read_until(b'EXECUTED=["select target;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x12wrong\x17targt\x02e\x05\r\r")
+    session.read_until(b'EXECUTED=["select target;"]')
+
+  def test_long_history_query_keeps_the_cursor_visible_while_editing(self) -> None:
+    session = self.start()
+    session.set_size(8, 28)
+    session.read_until(b"csql-with-history>")
+    session.send(b"select " + b"x" * 50 + b";\r")
+    session.read_until(b'EXECUTED=["select ' + b"x" * 50 + b';"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x12" + b"x" * 50)
+    screen = AnsiScreen(rows=8, columns=28)
+    screen.feed(session.read_for(0.05))
+    self.assertLess(screen.column, 28)
+    session.send(b"\x01\x06\x06\x06")
+    screen.feed(session.read_for(0.05))
+    self.assertEqual(3, screen.column)
+    session.send(b"\x15\x0btarget\x17\x19")
+    screen.feed(session.read_for(0.05))
+    self.assertEqual(6, screen.column)
+
+  def test_question_mark_opens_shortcuts_and_leaves_sql_question_marks_literal(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    initial = self.rendered_screen(session)
+    self.assertIn("? shortcuts", initial)
+    self.assertNotIn("Alt+Enter", initial)
+    session.send(b"?")
+    session.read_for(0.05)
+    help_screen = self.rendered_screen(session)
+    for key in ("Shortcuts", "Ctrl+Enter", "Ctrl+W", "Ctrl+Q", "Ctrl+N", "Ctrl+P"):
+      self.assertIn(key, help_screen)
+    self.assertNotIn("csql-with-history> ?", help_screen)
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    self.assertNotIn("Shortcuts", self.rendered_screen(session))
+    session.send(b"select '?';\r")
+    session.read_until(b"EXECUTED=[\"select '?';\"]")
+    self.assertEqual(["select '?';"], self.stored_commands())
+
+  def test_shortcuts_scroll_and_close_cleanly_in_a_small_terminal(self) -> None:
+    session = self.start()
+    session.set_size(7, 30)
+    session.read_until(b"csql-with-history>")
+    session.send(b"?")
+    session.read_for(0.05)
+    session.send(b"\x1b[B" * 30)
+    session.read_for(0.05)
+    screen = AnsiScreen(rows=7, columns=30)
+    screen.feed(bytes(session.output))
+    self.assertTrue(any("Search: Enter recalls;" in line for line in screen.display()), screen.display())
+    session.send(b"?select 42;\r")
+    session.read_until(b'EXECUTED=["select 42;"]')
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+    screen = AnsiScreen(rows=7, columns=30)
+    screen.feed(bytes(session.output))
+    self.assertEqual(1, sum("csql-with-history>" in line for line in screen.display()))
+    self.assertEqual(1, sum("SQL  draft" in line for line in screen.display()))
+    self.assertFalse(any("Shortcuts" in line for line in screen.display()))
+
+  def test_ctrl_q_discards_draft_quits_from_picker_and_help_and_restores_terminal(self) -> None:
+    pid_file = self.root / "quit-csql.pid"
+    self.environment["SYNTHETIC_PID_FILE"] = str(pid_file)
+    for draft in (b"", b"unfinished", b"unfinished\x12query", b"?"):
+      with self.subTest(draft=draft):
+        session = self.start()
+        session.read_until(b"csql-with-history>")
+        csql_process_id = int(pid_file.read_text(encoding="ascii"))
+        session.send(draft + b"\x11")
+        self.assertEqual(0, session.wait())
+        self.assertEqual(session.initial_attributes, session.terminal_attributes())
+        self.assertTrue(wait_for_process_exit(csql_process_id))
+    self.assertEqual([], self.stored_commands())
 
   def test_cursor_starts_after_prompt_and_tracks_inline_multiline_edits(self) -> None:
     # Shell-exported dimensions must not override the live PTY geometry.
@@ -913,7 +1057,8 @@ finally:
     self.assertIn(b"\x1b[1;38;2;203;166;247m", initial)
     self.assertIn(b"\x1b[38;2;205;214;244;48;2;24;24;37m", initial)
     self.assertIn(b"\x1b[1;38;2;137;180;250;48;2;24;24;37m", initial)
-    self.assertIn(b"Ctrl+R", initial)
+    self.assertIn(b"?", initial)
+    self.assertIn(b"shortcuts", initial)
     session.send(b"select\x0a42;\r")
 
     result = session.read_until(b'EXECUTED=["select", "42;"]')
