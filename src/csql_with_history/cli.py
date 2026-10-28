@@ -694,7 +694,7 @@ class DraftEditor:
     recalled = self.search.handle(event)
     if recalled is not None:
       self.draft.text = recalled
-      self.draft.cursor = 0
+      self.draft.cursor = len(recalled)
       self.history_index = None
 
   def _browse_older(self) -> None:

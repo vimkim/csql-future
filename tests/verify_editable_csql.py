@@ -741,7 +741,7 @@ def check_persistent_history(database: str, environment: dict[str, str], cwd: Pa
     recalled = reader.read_for(0.2)
     if b"row selected" in recalled:
       raise AssertionError("history search executed a multiline match during recall")
-    reader.send(b"\x1b[F 1 +\r")
+    reader.send(b"\x1b[A\x1b[F 1 +\r")
     reader.expect("1 row selected")
     reader.expect("csql-with-history>")
 

@@ -1050,8 +1050,8 @@ finally:
     session.send(b"\r")
     recalled = session.read_for(0.1)
     self.assertNotIn(b"EXECUTED", bytes(session.output[before:]) + recalled)
-    session.send(b"changed \r")
-    session.read_until(b'EXECUTED=["changed SELECT Alpha", "FROM Multiline;"]')
+    session.send(b"\x7f changed;\r")
+    session.read_until(b'EXECUTED=["SELECT Alpha", "FROM Multiline changed;"]')
 
   def test_history_search_deduplicates_by_latest_use_and_down_selects_older_match(self) -> None:
     session = self.start()

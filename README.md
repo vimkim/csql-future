@@ -136,7 +136,8 @@ In History search mode:
   term must occur somewhere in the complete command, including across embedded
   newlines.
 - Ctrl+N/P or Down/Up selects a result.
-- Enter recalls the selected result in Input mode for editing without execution.
+- Enter recalls the selected result in Input mode for editing without execution,
+  with the cursor at the end of the recalled text.
 - Esc restores the draft and cursor from before the search.
 - Ctrl+C closes search and clears the unfinished draft.
 - The text-editing keys listed above also edit the search query.
