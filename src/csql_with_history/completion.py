@@ -13,6 +13,46 @@ RIGHT ROLLBACK SELECT SET TABLE THEN UNION UPDATE VALUES VIEW WHEN WHERE
 """.split())
 
 
+# CUBRID 11.5 reserved-word snapshot from src/parser/keyword.c and the manual.
+# Keep quoting separate from the smaller list offered as keyword suggestions.
+RESERVED = frozenset("""
+ABSOLUTE ACCESS ACTION ADD ADD_MONTHS AFTER ALL ALLOCATE ALTER AND ANTI ANY ARE AS ASC
+ASSERTION ASYNC AT ATTACH ATTRIBUTE AVG BEFORE BEGIN BETWEEN BIGINT BINARY BIT BIT_LENGTH
+BLOB BOOLEAN BOTH BREADTH BY CALL CASCADE CASCADED CASE CAST CATALOG CHANGE CHAR CHARACTER
+CHECK CLASS CLASSES CLOB COALESCE COLLATE COLLATION COLUMN COMMIT CONNECT CONNECTION
+CONNECT_BY_ISCYCLE CONNECT_BY_ISLEAF CONNECT_BY_ROOT CONSTRAINT CONSTRAINTS CONTINUE
+CONVERT CORRESPONDING COUNT CREATE CROSS CURRENT CURRENT_DATE CURRENT_DATETIME
+CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE DATA DATABASE DATA_TYPE
+DATA_TYPE___ DATE DATETIME DATETIMELTZ DATETIMETZ DAY DAY_HOUR DAY_MILLISECOND DAY_MINUTE
+DAY_SECOND DEALLOCATE DEC DECIMAL DECLARE DEFAULT DEFERRABLE DEFERRED DELETE DEPTH DESC
+DESCRIBE DESCRIPTOR DIAGNOSTICS DIFFERENCE DISCONNECT DISTINCT DISTINCTROW DIV DO DOMAIN
+DOUBLE DROP DUPLICATE EACH ELSE ELSEIF END ENUM EQUALS ESCAPE EVALUATE EXCEPT EXCEPTION
+EXEC EXECUTE EXISTS EXTERNAL EXTRACT FALSE FETCH FILE FIRST FLOAT FOR FOREIGN FOUND FROM
+FULL FUNCTION GENERAL GET GLOBAL GO GOTO GRANT GROUP HAVING HOUR HOUR_MILLISECOND
+HOUR_MINUTE HOUR_SECOND IDENTITY IF IGNORE IMMEDIATE IN INDEX INDICATOR INHERIT INITIALLY
+INNER INOUT INPUT INSERT INT INTEGER INTERSECT INTERSECTION INTERVAL INTO IS ISOLATION
+JOIN JSON KEY LANGUAGE LAST LEADING LEAVE LEFT LESS LEVEL LIKE LIMIT LIST LOCAL LOCALTIME
+LOCALTIMESTAMP LOCAL_TRANSACTION_ID LOOP LOWER MATCH MAX MEDIUMINT MERGE METHOD
+MILLISECOND MIN MINUTE MINUTE_MILLISECOND MINUTE_SECOND MOD MODIFY MODULE MONETARY MONTH
+MULTISET MULTISET_OF NA NAMES NATIONAL NATURAL NCHAR NEXT NO NONE NOT NULL NULLIF NUMERIC
+OBJECT OCTET_LENGTH OF OFF ON ONLY OPTIMIZATION OPTION OR ORDER OUT OUTER OUTPUT OVERLAPS
+PARAMETERS PARTIAL PARTITION POSITION PRECISION PREPARE PRESERVE PRIMARY PRIOR PRIVILEGES
+PROCEDURE QUERY READ REAL RECURSIVE REF REFERENCES REFERENCING RELATIVE RENAME REPLACE
+RESIGNAL RESTRICT RETURN RETURNS REVOKE RIGHT ROLE ROLLBACK ROLLUP ROUTINE ROW ROWNUM ROWS
+SAVEPOINT SCHEMA SCOPE SCOPE___ SCROLL SEARCH SECOND SECOND_MILLISECOND SECTION SELECT
+SEMI SENSITIVE SEQUENCE SEQUENCE_OF SERIALIZABLE SESSION SESSION_USER SET SETEQ SETNEQ
+SET_OF SHARED SHORT SIBLINGS SIMILAR SIZE SMALLINT SOME SQL SQLCODE SQLERROR SQLEXCEPTION
+SQLSTATE SQLWARNING STATISTICS STRING SUBCLASS SUBSET SUBSETEQ SUBSTRING SUM SUPERCLASS
+SUPERSET SUPERSETEQ SYSDATE SYSDATETIME SYSTEM_USER SYSTIME SYSTIMESTAMP
+SYS_CONNECT_BY_PATH SYS_DATE SYS_DATETIME SYS_REFCURSOR SYS_TIME SYS_TIMESTAMP TABLE
+TEMPORARY THEN TIME TIMESTAMP TIMESTAMPLTZ TIMESTAMPTZ TIMEZONE_HOUR TIMEZONE_MINUTE
+TINYINT TO TRAILING TRANSACTION TRANSLATE TRANSLATION TRIGGER TRIM TRUE TRUNCATE UNDER
+UNION UNIQUE UNKNOWN UPDATE UPPER USAGE USE USER USING UTIME VACUUM VALUE VALUES VARCHAR
+VARIABLE VARYING VCLASS VIEW WHEN WHENEVER WHERE WHILE WITH WITHOUT WORK WRITE XOR YEAR
+YEAR_MONTH ZONE
+""".split())
+
+
 @dataclass(frozen=True)
 class Candidate:
   text: str
@@ -68,7 +108,7 @@ def unquote(value: str, closed: bool = True) -> str:
 
 
 def identifier(value: str, quote: str = "") -> str:
-  if not quote and re.fullmatch(r"[^\W\d]\w*", value, re.UNICODE) and value.upper() not in KEYWORDS:
+  if not quote and re.fullmatch(r"[^\W\d]\w*", value, re.UNICODE) and value.upper() not in RESERVED:
     return value
   quote = quote or '['
   closer = ']' if quote == '[' else quote
@@ -124,29 +164,34 @@ def tokenize(text: str) -> list[Token]:
 
 
 def statement_scope(tokens: list[Token], cursor: int) -> list[Token]:
-  """Use the current statement and innermost parenthesized scope only."""
+  """Keep expression parentheses in scope, but exclude other SELECT scopes."""
+  visible = [t for t in tokens if t.kind != 'comment']
   stack = []
-  start, depth = 0, 0
-  for token in tokens:
-    if token.start >= cursor:
-      break
-    if token.text == '(' and token.kind == "symbol":
-      stack.append(token.end)
-      depth += 1
-    elif token.text == ')' and token.kind == "symbol" and stack:
-      stack.pop()
-      depth -= 1
-    elif token.text == ';' and not stack:
-      start = token.end
-  if stack:
-    start = stack[-1]
-  end = len(tokens) and tokens[-1].end or cursor
-  for token in tokens:
-    if token.start >= cursor and token.kind == "symbol":
-      if token.text == ')' and token.depth < depth or token.text == ';' and token.depth == depth:
+  ranges = []
+  end = tokens[-1].end if tokens else cursor
+  for index, token in enumerate(visible):
+    if token.kind != 'symbol':
+      continue
+    if token.text == '(':
+      subquery = index + 1 < len(visible) and visible[index + 1].keyword in ('SELECT', 'WITH')
+      stack.append((token.end, subquery))
+    elif token.text == ')' and stack:
+      opened, subquery = stack.pop()
+      if subquery:
+        ranges.append((opened, token.start))
+  ranges.extend((opened, end + 1) for opened, subquery in stack if subquery)
+  containing = [(left, right) for left, right in ranges if left <= cursor <= right]
+  start, end = max(containing, default=(0, end + 1))
+  nested = [(left, right) for left, right in ranges if start < left and right <= end]
+  scoped = [t for t in visible if start <= t.start < end and not any(left <= t.start < right for left, right in nested)]
+  for token in scoped:
+    if token.kind == 'symbol' and token.text == ';':
+      if token.start < cursor:
+        start = token.end
+      else:
         end = token.start
         break
-  return [t for t in tokens if start <= t.start < end and t.depth == depth and t.kind != "comment"]
+  return [t for t in scoped if start <= t.start < end]
 
 
 def table_position(tokens: list[Token]) -> bool:
@@ -184,7 +229,7 @@ def referenced_relations(tokens: list[Token], schema: Schema) -> list[tuple[str,
     alias = name
     if index < len(tokens) and tokens[index].keyword == "AS":
       index += 1
-    if index < len(tokens) and tokens[index].kind in ("word", "identifier") and tokens[index].keyword not in KEYWORDS:
+    if index < len(tokens) and tokens[index].kind in ("word", "identifier") and tokens[index].keyword not in RESERVED:
       alias = tokens[index].name
     found.append((alias, matches[0]))
   return found

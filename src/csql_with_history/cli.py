@@ -593,7 +593,8 @@ class DraftEditor:
         if event.action is EditorAction.SUBMIT:
           return self.draft.text
         if event.action is EditorAction.COMPLETE:
-          if not self.draft.text[:self.draft.cursor].strip():
+          line_prefix = self.draft.text[:self.draft.cursor].rsplit("\n", 1)[-1]
+          if not line_prefix.strip():
             self.draft.insert("\t")
           elif self.catalog is None:
             self.draft.insert("\t")
@@ -750,6 +751,8 @@ class DraftEditor:
     if action is not None:
       return KeyEvent(action)
     if first == b"\x09":
+      if self.search.active:
+        return KeyEvent(EditorAction.INSERT, "\t")
       return KeyEvent(EditorAction.COMPLETE)
     if first == b"\x1b":
       return self._read_escape()
@@ -869,7 +872,9 @@ class DraftEditor:
       if suggestions.candidates:
         for index, candidate in enumerate(suggestions.candidates[start:start + available], start):
           marker = "> " if index == self.completion.selected else "  "
-          output.append(self._truncate(marker + candidate.text + "  " + candidate.detail, content_width))
+          label = marker + candidate.text + "  " + candidate.detail
+          label = ''.join(character if character.isprintable() else repr(character)[1:-1] for character in label)
+          output.append(self._truncate(label, content_width))
       else:
         output.append(self._truncate("(no completions)", content_width))
       status = " Completion | "

@@ -499,12 +499,36 @@ finally:
     record = json.loads((self.root / 'catalog.log').read_text().splitlines()[0])
     wait_for_process_exit(record['pid'])
 
+  def test_catalog_deadline_stops_the_query_and_preserves_sql_input(self) -> None:
+    self.enable_catalog()
+    self.environment['SYNTHETIC_CATALOG_DELAY'] = '30'
+    session = self.start(['-C'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'Schema unavailable; keywords only', timeout=5)
+    record = json.loads((self.root / 'catalog.log').read_text().splitlines()[0])
+    wait_for_process_exit(record['pid'])
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'de;\r')
+    session.read_until(b'EXECUTED=["select * from code;"]')
+    self.assertEqual(['select * from code;'], self.stored_commands())
+
   def test_no_completion_option_preserves_literal_tab_and_skips_metadata(self) -> None:
     session = self.start(['--no-completion', '-S'])
     session.read_until(b'csql-with-history>')
     session.send(b'select\t42;\r')
     session.read_until(b'EXECUTED=["select\\t42;"]')
     self.assertFalse((self.root / 'catalog.log').exists())
+
+  def test_completion_preserves_literal_tab_on_a_later_line_and_inside_strings(self) -> None:
+    session = self.start()
+    session.read_until(b'csql-with-history>')
+    session.send(b'select\x0a\t42;\r')
+    session.read_until(b'EXECUTED=["select", "\\t42;"]')
+    session.read_until(b'csql-with-history>')
+    session.send(b"select 'co\tding';\r")
+    session.read_until(b'EXECUTED=["select \'co\\tding\';"]')
 
   def test_standalone_snapshot_finishes_before_input_and_never_refreshes_live(self) -> None:
     self.enable_catalog()

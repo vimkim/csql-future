@@ -49,6 +49,7 @@ The accepted wrapper options are:
 - `--history-limit N`, defaulting to 10,000; `N` must be an integer.
 - `--no-history`, which disables saving while retaining read-only recall from an
   existing selected history file.
+- `--no-completion`, which disables schema lookups and keeps literal Tab input.
 
 Pipe input and csql's `-i`/`--input-file` and `-c`/`--command` forms go straight
 to csql without creating or changing wrapper history. Process replacement
@@ -89,6 +90,10 @@ scrolling within it keeps the preview frame and draft in place.
 
 In Input mode:
 
+- Tab opens completion. Ctrl+N/P, Down/Up, or repeated Tab selects a candidate.
+  Enter accepts it without executing SQL. Esc closes the list without changing
+  the draft. Enter submits SQL after the completion list closes.
+  Tab in indentation, strings, and comments inserts a literal tab.
 - Enter submits the entire draft.
 - **Ctrl+X Ctrl+E** opens the current draft in an external terminal editor.
   Press Ctrl+X, then Ctrl+E. The wrapper uses `$VISUAL`, then `$EDITOR`, then
@@ -269,6 +274,46 @@ left waiting indefinitely for terminal input. Ordinary `;exit`, empty-draft
 Ctrl+D, early csql error exits, and signal exits preserve the observed csql exit
 status behavior.
 
+## Schema completion
+
+For `select * from co`, Tab lists accessible tables and views whose names start
+with `co`. Table completion recognizes `FROM`, `JOIN`, `UPDATE`, `INSERT INTO`,
+and comma-separated tables. It respects owner-qualified and quoted identifiers.
+Names that require quoting receive brackets. SQL keywords are also available.
+Reserved-word quoting uses a CUBRID 11.5 keyword snapshot.
+
+Column completion resolves simple table aliases. For example, `c.na` in
+`select * from code c where c.na` can complete to `c.name`. A table later in
+the same draft can supply columns for an unfinished `SELECT` list. With multiple
+tables, unqualified column suggestions include aliases to avoid ambiguity.
+System tables, CTE names, derived-table columns, synonyms, correlated outer
+aliases, and SQL fragments held only in csql's command buffer are outside this
+initial implementation.
+
+Completion uses the installed `csql`, with no Python driver or editor dependency.
+It reads `db_class` and `db_attribute` as the launch user. Catalog queries stay
+outside the interactive SQL buffer and wrapper history. Metadata remains in
+memory for this wrapper session.
+
+In client/server mode, the first Tab starts a background lookup. The open list
+updates when names arrive. A later Tab refreshes metadata after 60 seconds.
+Submit `;refresh-completions` to request an immediate refresh. This wrapper
+command neither executes SQL nor creates a history entry. A separate connection
+sees committed schema. Its connection target and user remain those selected at
+launch, so restart the wrapper after changing the interactive connection.
+
+In standalone mode, a schema lookup finishes before the interactive client
+starts. The wrapper never opens another client while standalone csql owns the
+database. Names therefore reflect the initial snapshot. Restart the wrapper
+to refresh them. The snapshot can add up to three seconds to startup.
+
+Metadata queries use only credentials supplied in the launch arguments. They
+cannot reuse a password typed into csql's interactive prompt. If authentication
+or metadata loading fails, SQL editing and execution remain available, with
+keyword completion. A failed refresh retains previously cached names. Queries
+have a three-second deadline and a 16 MiB output limit. Their processes stop
+when the wrapper exits. Use `--no-completion` to skip all metadata queries.
+
 The default shell is not replaced for wrapper convenience. csql selects
 `CUBRID_CSQL_SHELL`, then `SHELL`, using its normal rules. The real-csql harness
 runs that configured shell once through direct csql and once through the wrapper,
@@ -301,6 +346,7 @@ standalone and client/server sessions. They remove their resources on exit:
 ```bash
 uv run python tests/verify_real_csql.py
 uv run python tests/verify_editable_csql.py
+uv run python tests/verify_completion_csql.py
 ```
 
 The real-csql comparison covers pipe, file, command, successful SQL, failing SQL,
@@ -359,4 +405,5 @@ The original worktree's uncommitted ticket 09 implementation was not included.
 This packaging task does not finish the original tickets 09–10: explicit
 ordinary-csql fallback for unsupported prompt states and the complete integrated
 production acceptance matrix remain pending in work-tracker item 172.
-Tab completion is not implemented; Tab inserts a tab into the draft.
+The completion implementation and its verification progress are recorded in
+[the completion checklist](docs/completion-plan.md).
