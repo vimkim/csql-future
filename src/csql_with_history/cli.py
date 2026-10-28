@@ -42,6 +42,7 @@ import unicodedata
 import uuid
 
 from .completion import CompletionMenu, suggest
+from .metadata import CatalogCache, Connection
 
 DEFAULT_HISTORY_LIMIT = 10_000
 DEFAULT_HISTORY_NAME = ".csql_history.sqlite3"
@@ -106,6 +107,7 @@ class WrapperOptions:
   history_file: Path
   history_limit: int
   no_history: bool
+  completion: bool = True
 
 
 class OptionError(ValueError):
@@ -477,9 +479,12 @@ class DraftEditor:
     self,
     history: SubmissionHistory,
     consume_resize: Callable[[], bool],
+    catalog: Optional[CatalogCache] = None,
   ) -> None:
     self.history = history
     self.consume_resize = consume_resize
+    self.catalog = catalog
+    self.catalog_revision = -1
     self.draft = TextBuffer()
     self.rendered_rows = 0
     self.cursor_to_bottom = 0
@@ -590,8 +595,12 @@ class DraftEditor:
         if event.action is EditorAction.COMPLETE:
           if not self.draft.text[:self.draft.cursor].strip():
             self.draft.insert("\t")
+          elif self.catalog is None:
+            self.draft.insert("\t")
           else:
-            suggestions = suggest(self.draft.text, self.draft.cursor)
+            self.catalog.request()
+            schema, message, self.catalog_revision = self.catalog.snapshot()
+            suggestions = suggest(self.draft.text, self.draft.cursor, schema, message)
             if suggestions.allowed:
               self.completion.open(self.draft.text, self.draft.cursor, suggestions)
             else:
@@ -698,6 +707,14 @@ class DraftEditor:
 
   def _read_key(self) -> KeyEvent:
     while True:
+      if self.catalog is not None and self.completion.active:
+        schema, message, revision = self.catalog.snapshot()
+        if revision != self.catalog_revision:
+          selected = self.completion.selected
+          self.completion.suggestions = suggest(self.draft.text, self.draft.cursor, schema, message)
+          self.completion.selected = min(selected, max(0, len(self.completion.suggestions.candidates) - 1))
+          self.catalog_revision = revision
+          return KeyEvent(EditorAction.REDRAW)
       if self.consume_resize():
         return KeyEvent(EditorAction.REDRAW)
       ready, _, _ = select.select([0], [], [], 0.05)
@@ -854,8 +871,11 @@ class DraftEditor:
           marker = "> " if index == self.completion.selected else "  "
           output.append(self._truncate(marker + candidate.text + "  " + candidate.detail, content_width))
       else:
-        output.append(self._truncate(suggestions.message or "(no completions)", content_width))
-      output.append(STATUS_STYLE + self._truncate(" Completion | Ctrl+N/P select | Enter accepts | Esc cancels ", content_width) + RESET)
+        output.append(self._truncate("(no completions)", content_width))
+      status = " Completion | Ctrl+N/P select | Enter accepts | Esc cancels "
+      if suggestions.message:
+        status += "| " + suggestions.message
+      output.append(STATUS_STYLE + self._truncate(status, content_width) + RESET)
     elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
       cursor_visual_row = len(output)
@@ -1372,6 +1392,7 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
   history_file = launch_directory / DEFAULT_HISTORY_NAME
   history_limit = DEFAULT_HISTORY_LIMIT
   no_history = False
+  completion = True
   forwarded: List[str] = []
   index = 0
 
@@ -1383,6 +1404,10 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
 
     if argument == "--no-history":
       no_history = True
+      index += 1
+      continue
+    if argument == "--no-completion":
+      completion = False
       index += 1
       continue
 
@@ -1412,7 +1437,7 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
     else:
       index += 1
 
-  options = WrapperOptions(history_file.resolve(strict=False), history_limit, no_history)
+  options = WrapperOptions(history_file.resolve(strict=False), history_limit, no_history, completion)
   return options, forwarded
 
 
@@ -1426,6 +1451,61 @@ def _integer_limit(value: str) -> int:
 def find_csql() -> Optional[str]:
   # Follow the selected CUBRID environment, including csql.sh's verified client.
   return shutil.which("csql")
+
+
+def completion_connection(arguments: Sequence[str]) -> Optional[Connection]:
+  """Copy only connection options, never output, SQL, or utility actions."""
+  values = {}
+  databases = []
+  standalone = False
+  index = 0
+  while index < len(arguments):
+    argument = arguments[index]
+    if argument == '--':
+      databases.extend(arguments[index + 1:])
+      break
+    if argument.startswith('--'):
+      option = _resolved_csql_long_option(argument)
+      if option is None or option in ('sysadm', 'sysadm-rebuild-catalog', 'write-on-standby'):
+        return None
+      if option in ('SA-mode', 'CS-mode'):
+        standalone = option == 'SA-mode'
+      if option in CSQL_LONG_OPTIONS_WITH_VALUE:
+        if '=' in argument:
+          value = argument.split('=', 1)[1]
+        elif index + 1 < len(arguments):
+          index += 1
+          value = arguments[index]
+        else:
+          return None
+        if option in ('user', 'password'):
+          values[option] = value
+    elif argument.startswith('-') and argument != '-':
+      for position, option in enumerate(argument[1:], 1):
+        if option in ('S', 'C'):
+          standalone = option == 'S'
+        elif option in CSQL_SHORT_OPTIONS_WITH_VALUE:
+          value = argument[position + 1:]
+          if not value:
+            if index + 1 >= len(arguments):
+              return None
+            index += 1
+            value = arguments[index]
+          if option in ('u', 'p'):
+            values['user' if option == 'u' else 'password'] = value
+          break
+        elif option not in {'e', 's', 'l', 'r', 't', 'N', 'q', 'd'}:
+          return None
+    else:
+      databases.append(argument)
+    index += 1
+  if len(databases) != 1 or databases[0].startswith('-'):
+    return None
+  copied = ['-S' if standalone else '-C']
+  for key, value in values.items():
+    copied.extend(['--' + key + '=' + value])
+  copied.append(databases[0])
+  return Connection(tuple(copied), standalone)
 
 
 def is_interactive(arguments: Sequence[str]) -> bool:
@@ -1458,8 +1538,11 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
   previous_signal_mask = signal.pthread_sigmask(signal.SIG_BLOCK, TERMINATION_SIGNALS)
   terminal: Optional[CsqlTerminal] = None
   history: Optional[SubmissionHistory] = None
+  catalog: Optional[CatalogCache] = None
   signal_mask_restored = False
   try:
+    if options.completion:
+      catalog = CatalogCache(executable, completion_connection(arguments))
     terminal = CsqlTerminal(executable, arguments, previous_signal_mask)
     signal_mask_restored = True
     signal.pthread_sigmask(signal.SIG_SETMASK, previous_signal_mask)
@@ -1467,7 +1550,7 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
       return terminal.returncode()
 
     history = SubmissionHistory(options.history_file, options.history_limit, options.no_history)
-    editor = DraftEditor(history, terminal.consume_resize)
+    editor = DraftEditor(history, terminal.consume_resize, catalog)
     while True:
       submission = editor.read()
       # A foreground editor receives SIGWINCH itself. Refresh csql's private
@@ -1477,6 +1560,9 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
         if not terminal.send_eof():
           break
       else:
+        if catalog is not None and submission.strip() == ';refresh-completions':
+          catalog.request(force=True)
+          continue
         history.save(submission)
         if not terminal.send_submission(submission):
           break
@@ -1488,6 +1574,8 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
       signal.pthread_sigmask(signal.SIG_SETMASK, previous_signal_mask)
     if history is not None:
       history.close()
+    if catalog is not None:
+      catalog.close()
     if terminal is not None:
       terminal.close()
 

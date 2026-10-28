@@ -11,7 +11,7 @@ the installed `csql`. No new Python runtime dependency is required.
   Enter accepts a candidate without submitting SQL. Other modes retain their keys.
 - [x] **2. SQL context.** Detect table positions in unfinished SQL. Replace the
   identifier at the cursor. Respect comments, strings, owners, and quoted names.
-- [ ] **3. Catalog provider.** Fetch accessible tables and columns through a
+- [x] **3. Catalog provider.** Fetch accessible tables and columns through a
   bounded background `csql` process in client/server mode. Parse plain output.
 - [ ] **4. Standalone snapshot.** Fetch metadata before the standalone client
   starts. Close the metadata client before starting the interactive client.
@@ -46,7 +46,8 @@ Metadata failure leaves SQL editing and execution available.
 - Preserved the separate help/editor task and the older fallback task.
 - Menu implementation and focused PTY verification are complete.
 - SQL context and full identifier replacement are complete.
-- Next action: connect the catalog provider and its bounded process lifecycle.
+- Client/server catalog loading and process cleanup are complete.
+- Next action: add the sequential standalone snapshot.
 
 ## Verification log
 
@@ -62,3 +63,7 @@ verification before starting the next step.
 
 Step 2: six SQL-context tests passed. Cases include relation positions, owners,
 quotes, replacement suffixes, comments, strings, aliases, and nested scopes.
+
+Step 3: catalog PTY tests passed. They verify asynchronous menu updates, cache
+reuse, explicit refresh, responsive editing during a slow query, and process
+cleanup on exit. All nine launch/bypass tests passed.

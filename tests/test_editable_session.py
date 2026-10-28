@@ -57,6 +57,17 @@ import termios
 import time
 import tty
 
+if "-c" in sys.argv:
+  catalog_log = os.environ.get("SYNTHETIC_CATALOG_LOG")
+  if catalog_log:
+    with open(catalog_log, "a") as stream:
+      stream.write(json.dumps({"pid": os.getpid(), "arguments": sys.argv[1:]}) + "\\n")
+  time.sleep(float(os.environ.get("SYNTHETIC_CATALOG_DELAY", "0")))
+  if os.environ.get("SYNTHETIC_CATALOG_FAIL") or "SYNTHETIC_CATALOG" not in os.environ:
+    sys.exit(1)
+  print(os.environ["SYNTHETIC_CATALOG"], flush=True)
+  sys.exit(0)
+
 prompt = os.environ.get("CUBRID_CSQL_PROMPT", "csql") + "> "
 command_buffer = []
 automatic = True
@@ -178,6 +189,16 @@ finally:
     self.environment = os.environ.copy()
     self.environment["PATH"] = os.pathsep.join((str(self.bin_directory), self.environment.get("PATH", "")))
     self.environment["SYNTHETIC_RAW_HANDOFF"] = str(self.raw_handoff)
+    self.environment["SYNTHETIC_CATALOG_LOG"] = str(self.root / "catalog.log")
+
+  def enable_catalog(self) -> None:
+    self.environment['SYNTHETIC_CATALOG'] = '\n'.join((
+      'kind\tlogin_name\towner_name\tclass_name\titem_name\titem_type',
+      'relation\tDBA\tDBA\tcode\tcode\tCLASS',
+      'relation\tDBA\tDBA\tcoding\tcoding\tCLASS',
+      'column\tDBA\tDBA\tcode\tname\tINSTANCE',
+      'column\tDBA\tDBA\tcoding\tlanguage\tINSTANCE',
+    ))
 
   def start(
     self,
@@ -433,6 +454,50 @@ finally:
     session.read_for(0.1)
     session.send(b";\r")
     session.read_until(b'EXECUTED=["nonesuch;"]')
+
+  def test_catalog_completion_updates_the_open_menu_and_reuses_the_cache(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-C', '-u', 'dba'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'> code  table DBA')
+    self.assertEqual([], self.stored_commands())
+    session.send(b'\x0e\r;\r')
+    session.read_until(b'EXECUTED=["select * from coding;"]')
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'> code  table DBA')
+    self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'\x03;refresh-completions\r')
+    session.read_until(b'csql-with-history>')
+    session.read_for(0.2)
+    self.assertEqual(2, len((self.root / 'catalog.log').read_text().splitlines()))
+    self.assertEqual(['select * from coding;'], self.stored_commands())
+
+  def test_catalog_wait_does_not_block_editing_and_exit_cancels_the_process(self) -> None:
+    self.enable_catalog()
+    self.environment['SYNTHETIC_CATALOG_DELAY'] = '30'
+    session = self.start(['-C'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'Loading schema')
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'ding;\r')
+    session.read_until(b'EXECUTED=["select * from coding;"]', timeout=1)
+    session.send(b'\x11')
+    self.assertEqual(0, session.wait(2))
+    record = json.loads((self.root / 'catalog.log').read_text().splitlines()[0])
+    wait_for_process_exit(record['pid'])
+
+  def test_no_completion_option_preserves_literal_tab_and_skips_metadata(self) -> None:
+    session = self.start(['--no-completion', '-S'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select\t42;\r')
+    session.read_until(b'EXECUTED=["select\\t42;"]')
+    self.assertFalse((self.root / 'catalog.log').exists())
 
   def test_unix_editing_keys_preserve_the_draft_around_the_cursor(self) -> None:
     cases = (
