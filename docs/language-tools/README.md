@@ -29,11 +29,13 @@ Other 11.5 builds and CUBRID 11.4 require separate qualification.
 | Task checkout | `/home/vimkim/gh/csql-future-project` |
 | Merge destination | `main` in `/home/vimkim/gh/csql-future` |
 | Work record | `work-tracker show 569` |
-| Concurrent work | Completion expansion, work 568, branch `completion/commands` |
+| Completion integration observed | Work 568 completed in main commit `99d49e13698b609ff4885a418578f7f50485e82f` |
 
 The primary checkout contained unrelated untracked legacy-package bytecode at inspection.
 Other sessions own their worktrees and may advance independently.
 The future coordinator must inspect live state before extracting completion code.
+The planning branch still has the original baseline until its approved rebase.
+Ticket 01 must include the integrated completion commit in its actual dispatch baseline.
 
 ## Delivery boundary
 

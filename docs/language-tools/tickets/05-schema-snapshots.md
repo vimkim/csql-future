@@ -24,6 +24,7 @@ Coordinate edits to shared LSP configuration handlers.
 ## Acceptance criteria
 
 - [ ] Schema v1 snapshots produce relation, owner, alias-column, and quoted-name suggestions through the core and LSP.
+- [ ] Snapshot conversion preserves integrated users, database identity, system flags, and index names. Their command-context suggestions remain available.
 - [ ] No snapshot produces keyword completion and no invented catalog names.
 - [ ] Initial invalid/missing snapshots produce a visible availability message. Failed reloads retain the previous valid snapshot as stale.
 - [ ] An explicit reload or per-document configuration change updates completion without editing the document.

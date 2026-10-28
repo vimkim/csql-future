@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "planningBaseline": "c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f",
   "externalBlockers": {"E01": "Reconcile integrated completion behavior with concurrent work 568 before extraction."},
+  "externalEvidence": {"E01": {"status": "integrated-in-main", "commit": "99d49e13698b609ff4885a418578f7f50485e82f", "requireInDispatchBaseline": true}},
   "tickets": [
     {"id": "01", "file": "01-completion-core.md", "blockedBy": [], "externalBlockers": ["E01"], "status": "specified"},
     {"id": "02", "file": "02-native-worker.md", "blockedBy": [], "externalBlockers": [], "status": "specified"},

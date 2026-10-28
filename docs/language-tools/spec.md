@@ -135,7 +135,7 @@ Tickets 06 and 07 qualify the following release scope:
 | Queries and DML | SELECT, CTEs/subqueries, joins, expressions, INSERT, UPDATE, DELETE, MERGE | Syntax only; result-column inference for CTE completion remains deferred |
 | Schema | CREATE/ALTER/DROP TABLE, VIEW, INDEX, SERIAL | Other object kinds remain unsupported until explicitly qualified |
 | Engineer commands | SHOW, DESCRIBE/DESC, EXPLAIN where present in the selected release, EVALUATE, statistics, tracing, transaction/settings statements | Release-valid spellings come from pinned source/manual evidence, not this list alone |
-| CSQL script commands | Exact `;help`, `;quit`, and `;autocommit on/off` lines | Validate spelling/arguments only; no session behavior executes |
+| CSQL script commands | Exact `;help`, `;exit`, and `;autocommit on/off` lines | Validate spelling/arguments only; no session behavior executes |
 | Unsupported script constructs | Other CSQL commands, external shell commands, includes, delimiter changes, PL/CSQL routine bodies | Return unsupported coverage; do not skip them and claim a complete pass |
 
 This table selects work, not an assertion that every listed spelling exists in the pinned 11.5 build.
@@ -152,6 +152,10 @@ Keep client/server background refresh and sequential standalone snapshot prepara
 The extraction must include any completion extensions integrated by work 568 before implementation begins.
 Do not freeze the older SHOW-only behavior as the permanent baseline.
 No ticket modifies or integrates the other session's branch on its behalf.
+Work 568 completed during planning and entered `main` as `99d49e13698b609ff4885a418578f7f50485e82f`.
+That integration adds command contexts, generated vocabulary, and schema fields for indexes, users, system relations, and database identity.
+The vocabulary records 11.4 manual provenance and must retain that provenance during extraction.
+Its presence does not certify 11.5 syntax coverage.
 
 Initial mandatory completion covers the integrated terminal baseline: keywords, relations, owners, quoting, aliases, columns, and supported command contexts.
 CTE result-column inference, derived-table columns, correlated outer references, and synonyms remain later completion work.

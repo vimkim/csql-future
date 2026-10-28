@@ -53,14 +53,14 @@ Do not infer integration approval from this planning packet or an upstream skill
 
 ## External completion dependency E01
 
-Work 568 expands terminal command/catalog completion on `completion/commands`.
-At planning time it remained active and unintegrated.
-Ticket 01 must inspect its current status and actual integration commits.
-If that work is integrated, base extraction on the resulting terminal behavior.
-If it remains active, coordinate the extraction seam before editing overlapping code.
-Use independent ticket 02 while waiting.
-Do not revert, cherry-pick, merge, or overwrite that session's work without authorization.
-Record the resolved baseline in the dispatch record.
+Work 568 completed during planning.
+Main includes its integration commit `99d49e13698b609ff4885a418578f7f50485e82f`.
+Its owner removed the completion worktree and branch after integration.
+Ticket 01 must check that its dispatch baseline includes that result or a verified successor.
+Preserve the expanded command contexts, vocabulary, catalog fields, and regression coverage.
+The current planning branch still starts at the earlier `c292d00` baseline until approved rebase.
+Use independent ticket 02 if ticket 01's integration baseline remains unresolved.
+Record the checked baseline in the dispatch record.
 
 ## Fresh-agent contract
 

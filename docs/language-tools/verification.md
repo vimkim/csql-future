@@ -60,3 +60,13 @@ The user selected 11.5 first during review.
 All implementation targets now use the observed build's exact profile.
 A research review also required conservative feature predicates before native parsing.
 The revised contracts and ticket 02 include that requirement.
+
+## Main advanced after the planning baseline checks
+
+Another session integrated completion work 568 as `99d49e13698b609ff4885a418578f7f50485e82f` during this session.
+The primary checkout is clean and its completion task worktree was removed by its owner.
+Work item 568 reports a passing 130-test suite and real-CUBRID acceptance for that integration.
+Those are the other session's results, not fresh checks performed by this planning session.
+The 117-test results above belong to the planning branch's original `c292d00` baseline.
+The approved rebase must include the newer completion behavior and run proportionate combined checks.
+The contracts and snapshot ticket now preserve its added schema metadata.

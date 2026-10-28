@@ -11,7 +11,7 @@
     {"id": "unicode-crlf-invalid", "mode": "sql", "text": "-- 한글 😀\r\nCREATE SERIAL 주문 START WITH ;", "expectedStatus": "syntax-error", "expectedCode": "CUBRID-S1001", "introducedBy": "03"},
     {"id": "multiple-statements", "mode": "sql", "text": "SELECT 1; CREATE SERIAL order_no START WITH 10;", "expectedStatus": "valid", "introducedBy": "03"},
     {"id": "nonexecuted-drop", "mode": "sql", "text": "DROP TABLE must_never_be_executed;", "expectedStatus": "valid", "introducedBy": "07"},
-    {"id": "csql-command-lines", "mode": "csql", "text": ";help\nSELECT 1;\n;autocommit off\n;quit\n", "expectedStatus": "valid", "introducedBy": "08"},
+    {"id": "csql-command-lines", "mode": "csql", "text": ";help\nSELECT 1;\n;autocommit off\n;exit\n", "expectedStatus": "valid", "introducedBy": "08"},
     {"id": "csql-include-unsupported", "mode": "csql", "text": ";read must-not-open.sql\nSELECT 1;\n", "expectedStatus": "unsupported", "expectedCode": "CUBRID-U1002", "introducedBy": "08"},
     {"id": "plcsql-unsupported", "mode": "csql", "text": "CREATE PROCEDURE p() AS BEGIN NULL; END;\n", "expectedStatus": "unsupported", "expectedCode": "CUBRID-U1002", "introducedBy": "08"}
   ]

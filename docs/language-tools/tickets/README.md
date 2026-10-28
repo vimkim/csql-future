@@ -19,7 +19,9 @@ The [spec](../spec.md), [contracts](../contracts.md), and [execution rules](../e
 | 11 | [Check installation and the complete delivery matrix](11-delivery.md) | 06, 07, 09, 10 | Reproducible local artifacts and end-to-end acceptance |
 
 E01 is the external state described in the execution rules.
-Ticket 02 can proceed while ticket 01 waits for that reconciliation.
+It completed in main commit `99d49e1` during planning.
+Ticket 01 can proceed when its actual integration baseline contains that result.
+Ticket 02 remains independent of the completion baseline.
 Ticket 04 must pass before broad syntax work or editor packaging.
 Tickets 05–08 can run concurrently with separate ownership after ticket 04.
 Tickets 09 and 10 can then run concurrently.

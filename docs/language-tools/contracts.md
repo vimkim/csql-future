@@ -44,7 +44,7 @@ The second line starts at code-point offset 5 and UTF-8 byte offset 10.
 `complete(text, cursor, profile, schema=None)` returns one immutable result.
 The result contains a replacement span, ordered items, an allowed flag, and optional availability information.
 Each item contains insertion text, a label, and a kind/detail.
-Caller-supplied schema values contain user, relations, owners, kinds, and columns.
+Caller-supplied schema values preserve the integrated terminal schema, including users, database identity, system flags, and indexes.
 
 Calls perform no filesystem, network, subprocess, environment, or terminal operations.
 The same inputs produce the same ordered output.
@@ -146,6 +146,9 @@ Completion remains usable while the worker starts, parses, or fails.
 Editor v1 reads optional JSON with `schemaVersion: 1`, `user`, and `relations`.
 Each relation contains `owner`, `name`, `kind`, and a list of column names.
 `kind` is `CLASS` or `VCLASS` in the first contract.
+Preserve optional top-level `users` and `database`, defaulting to an empty list and empty string.
+Preserve optional relation fields `system` and `indexes`, defaulting to false and an empty list.
+Validate their types and retain them when converting the integrated terminal schema.
 Names preserve their spelling.
 Unknown fields are ignored, but invalid required fields reject the snapshot.
 Snapshots contain metadata only, never credentials or executable commands.

@@ -18,7 +18,7 @@ The coordinator supplies the exact dispatch baseline and blocker commits.
 Own `validation/scripts.py`, script fixtures/tests, and script-mode documentation.
 Recognize session lines only at eligible CSQL line boundaries outside strings, quoted identifiers, and comments.
 Preserve a source map when sending SQL portions to the native parser.
-Qualify exact `;help`, `;quit`, and `;autocommit on/off` lines.
+Qualify exact `;help`, `;exit`, and `;autocommit on/off` lines.
 Other session commands, includes, shell commands, delimiter changes, and PL/CSQL bodies remain unsupported.
 Do not implement session effects or include-file loading.
 

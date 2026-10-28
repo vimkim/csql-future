@@ -10,13 +10,15 @@
 
 Read [spec](../spec.md), [contracts](../contracts.md), and [execution](../execution.md).
 Read the integrated completion, metadata, CLI, and completion/PTY tests.
+Include `syntax.py`, `completion_data.py`, and `test_command_completion.py` from main commit `99d49e1`.
 Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
 The coordinator supplies the exact dispatch baseline and the resolved work-568 commits.
 
 ## Scope and ownership
 
 Own `src/csql_future/language/`, the compatibility surface in `completion.py`, and necessary imports in `cli.py` and `metadata.py`.
-Own focused completion regression additions in `tests/test_completion.py` and a new `tests/test_language_core.py`.
+Include necessary import adjustments in `syntax.py` and `completion_data.py` without changing their recorded provenance.
+Own focused additions in `tests/test_completion.py`, `tests/test_command_completion.py`, and a new `tests/test_language_core.py`.
 Keep menu state in the terminal adapter.
 Retain old imports through a compatibility adapter during migration.
 Do not change catalog queries, history behavior, key bindings, native parsing, or editor clients.
