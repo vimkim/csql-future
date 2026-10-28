@@ -11,6 +11,19 @@ multiline editing to CUBRID's command-line SQL client. It runs your installed
 [Get started](#get-started) · [Keyboard shortcuts](#keyboard-shortcuts) ·
 [Usage guide](docs/usage.md) · [Report an issue](https://github.com/vimkim/csql-future/issues)
 
+## Watch a demodb session
+
+<p align="center">
+  <img src="assets/readme/demodb-demo.gif" width="100%" alt="Real demodb standalone session: complete SELECT, filter hints to PARALLEL, choose athlete from table names, move back to complete its columns, run the query, complete a session command, and quit">
+</p>
+
+Start with `s` + **Tab**, accept `SELECT`, then open hint completion with
+`/*+` + **Tab** and type `PARA` to select `PARALLEL`. After `FROM` + **Tab**,
+choose `athlete`, move back after the hint, and press **Tab** for its columns.
+The recording runs the query, completes `;plan detail`, and quits with `;exit`.
+This is the real editor and CUBRID sample database in standalone (`-S`) mode.
+[Recording source and regeneration](assets/readme/README.md#live-demodb-recording).
+
 ## Find the SQL you already wrote
 
 Press **Ctrl+R**, type a few words, and recall a previous query for editing.
@@ -51,7 +64,7 @@ This works with `/*+ ... */`, `--+`, and `//+`, including unfinished comments.
 Hint names use a CUBRID 11.5 parser snapshot; arguments such as `USE_NL(t)` are
 entered manually. Ordinary comments and strings keep literal Tab input.
 
-*These are captures of the actual editor, using illustrative history and an
+*The static images capture the actual editor, using illustrative history and an
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.md).*
 
 ## Get started
