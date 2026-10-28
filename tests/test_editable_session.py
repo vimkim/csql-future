@@ -310,7 +310,7 @@ finally:
         session.send(b"\x11")
         self.assertEqual(0, session.wait())
         self.assertEqual(session.initial_attributes, session.terminal_attributes())
-    self.assertEqual(["select 12;"] * len(cases), self.stored_commands())
+    self.assertEqual(["select 12;"], self.stored_commands())
 
   def test_unchanged_external_edit_preserves_cursor_trailing_newlines_and_empty_draft(self) -> None:
     self.configure_editor("print('UNCHANGED-EDITOR-RETURN', flush=True)\n")
@@ -443,7 +443,7 @@ finally:
     session.read_until(b"csql-with-history>")
     session.send(b"\x10\r")
     session.read_until(b'EXECUTED=["SELECT 42;"]')
-    self.assertEqual(["SELECT 42;", "SELECT 42;"], self.stored_commands())
+    self.assertEqual(["SELECT 42;"], self.stored_commands())
 
   def test_completion_help_preserves_selection_and_external_editor_remains_available(self) -> None:
     self.enable_catalog()
@@ -675,7 +675,7 @@ finally:
         session.send(b"select" + newline + b"42;\r")
         session.read_until(b'EXECUTED=["select", "42;"]')
         session.read_until(b"csql-with-history>")
-    self.assertEqual(["select\n42;"] * 3, self.stored_commands())
+    self.assertEqual(["select\n42;"], self.stored_commands())
 
   def test_ctrl_n_and_ctrl_p_select_history_and_restore_a_multiline_draft(self) -> None:
     session = self.start()
@@ -797,7 +797,7 @@ finally:
     restarted.send(b"\x12")
     restarted.read_for(0.05)
     self.assertIn("(just now)", self.rendered_screen(restarted))
-    self.assertEqual(["select timestamped;"] * 2, self.stored_commands())
+    self.assertEqual(["select timestamped;"], self.stored_commands())
 
   def test_short_help_preview_starts_with_history_search_and_scrolls_in_place(self) -> None:
     session = self.start()
@@ -1062,7 +1062,7 @@ finally:
       session.read_until(b"csql-with-history>")
 
     self.assertEqual(
-      ["select target_repeat;", "select target_distinct;", "select target_repeat;"],
+      ["select target_distinct;", "select target_repeat;"],
       self.stored_commands(),
     )
     session.send(b"draft\x12target")
@@ -1081,7 +1081,7 @@ finally:
     session.send(b"\r")
     session.read_until(b'EXECUTED=["select target_distinct;"]')
 
-  def test_configured_retention_counts_duplicates_and_keeps_latest_use_order(self) -> None:
+  def test_configured_retention_counts_unique_commands_and_keeps_latest_use_order(self) -> None:
     session = self.start(["--history-limit", "3"])
     session.read_until(b"csql-with-history>")
     for command in ("select first;", "select repeat;", "select middle;", "select repeat;"):
@@ -1090,7 +1090,7 @@ finally:
       session.read_until(b"csql-with-history>")
 
     self.assertEqual(
-      ["select repeat;", "select middle;", "select repeat;"],
+      ["select first;", "select middle;", "select repeat;"],
       self.stored_commands(),
     )
     session.send(b"\x1b[A")
@@ -1099,6 +1099,9 @@ finally:
     session.send(b"\x1b[A")
     session.read_for(0.05)
     self.assertIn("select middle;", self.rendered_screen(session))
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select first;", self.rendered_screen(session))
 
   def test_default_retention_keeps_latest_ten_thousand_and_deduplicates_recall(self) -> None:
     history_file = self.root / "default-retention.sqlite3"
@@ -1136,8 +1139,17 @@ finally:
 
     retained = self.stored_commands(history_file)
     self.assertEqual(10_000, len(retained))
+    self.assertEqual("select boundary_00000;", retained[0])
+    self.assertEqual("select newest_default;", retained[-1])
+    self.assertEqual(10_000, len(set(retained)))
+
+    second.send(b"select newest_extra;\r")
+    second.read_until(b'EXECUTED=["select newest_extra;"]')
+    second.read_until(b"csql-with-history>")
+    retained = self.stored_commands(history_file)
+    self.assertEqual(10_000, len(retained))
     self.assertEqual("select boundary_00001;", retained[0])
-    self.assertEqual(["select newest_default;", "select newest_default;"], retained[-2:])
+    self.assertEqual(["select newest_default;", "select newest_extra;"], retained[-2:])
 
     first.send(b"\x12newest_default")
     first.read_for(0.05)
@@ -1299,7 +1311,6 @@ finally:
         "42;",
         ";xrun",
         ";singleline on",
-        "bad;",
         "select\n84;",
         "bad;",
       ],

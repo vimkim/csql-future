@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""History timestamp compatibility and relative-age checks."""
+"""History deduplication, retention, timestamp compatibility, and relative ages."""
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -24,20 +24,26 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from csql_with_history.cli import SubmissionHistory, format_history_age
+from csql_with_history.cli import HistoryMode, SubmissionHistory, format_history_age
 
 
-class HistoryTimestampTest(unittest.TestCase):
+class SubmissionHistoryTest(unittest.TestCase):
 
   def setUp(self) -> None:
     temporary = tempfile.TemporaryDirectory()
     self.addCleanup(temporary.cleanup)
     self.path = Path(temporary.name) / "history.sqlite3"
 
-  def open_history(self, save_disabled: bool = False) -> SubmissionHistory:
-    history = SubmissionHistory(self.path, 100, save_disabled)
+  def open_history(self, save_disabled: bool = False, limit: int = 100) -> SubmissionHistory:
+    history = SubmissionHistory(self.path, limit, save_disabled)
     self.addCleanup(history.close)
     return history
+
+  def stored_entries(self) -> list[tuple[str, float | None]]:
+    with closing(sqlite3.connect(self.path)) as connection:
+      return connection.execute(
+        "SELECT command, submitted_at FROM submissions ORDER BY id"
+      ).fetchall()
 
   def make_legacy_history(self) -> None:
     with closing(sqlite3.connect(self.path)) as connection:
@@ -58,6 +64,9 @@ class HistoryTimestampTest(unittest.TestCase):
 
   def test_read_only_legacy_history_is_not_migrated(self) -> None:
     self.make_legacy_history()
+    with closing(sqlite3.connect(self.path)) as connection:
+      connection.execute("INSERT INTO submissions(command) VALUES ('select legacy;')")
+      connection.commit()
     original = self.path.read_bytes()
     history = self.open_history(save_disabled=True)
     self.assertEqual(["select legacy;"], history.entries())
@@ -65,6 +74,37 @@ class HistoryTimestampTest(unittest.TestCase):
     history.save("select excluded;")
     history.close()
     self.assertEqual(original, self.path.read_bytes())
+
+  def test_writable_open_keeps_the_latest_duplicate_row_and_timestamp(self) -> None:
+    with closing(sqlite3.connect(self.path)) as connection:
+      connection.execute(
+        "CREATE TABLE submissions (id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL)"
+      )
+      connection.executemany(
+        "INSERT INTO submissions(command, submitted_at) VALUES (?, ?)",
+        [("select repeat;", 3000), ("select distinct;", 2000), ("select repeat;", 1000)],
+      )
+      connection.commit()
+    history = self.open_history()
+    self.assertEqual(["select repeat;", "select distinct;"], history.entries())
+    expected = [("select distinct;", 2000), ("select repeat;", 1000)]
+    self.assertEqual(expected, self.stored_entries())
+    history.close()
+    restarted = self.open_history()
+    self.assertEqual(["select repeat;", "select distinct;"], restarted.entries())
+    self.assertEqual(expected, self.stored_entries())
+
+  def test_legacy_duplicates_are_cleaned_during_timestamp_migration(self) -> None:
+    self.make_legacy_history()
+    with closing(sqlite3.connect(self.path)) as connection:
+      connection.executemany(
+        "INSERT INTO submissions(command) VALUES (?)",
+        [("select distinct;",), ("select legacy;",)],
+      )
+      connection.commit()
+    history = self.open_history()
+    self.assertEqual(["select legacy;", "select distinct;"], history.entries())
+    self.assertEqual([("select distinct;", None), ("select legacy;", None)], self.stored_entries())
 
   def test_concurrent_legacy_openers_both_migrate_and_read_the_store(self) -> None:
     self.make_legacy_history()
@@ -91,6 +131,78 @@ class HistoryTimestampTest(unittest.TestCase):
     entries = first.records()
     self.assertEqual(["select\n'one';", "select two;"], [entry.command for entry in entries])
     self.assertEqual([2000, 2000], [entry.submitted_at for entry in entries])
+    self.assertEqual([("select two;", 2000), ("select\n'one';", 2000)], self.stored_entries())
+
+  def test_repeated_saves_update_latest_use_without_evicting_distinct_commands(self) -> None:
+    history = self.open_history(limit=3)
+    for submitted_at, command in enumerate(("first", "repeat", "middle", "repeat")):
+      with patch("csql_with_history.cli.time.time", return_value=submitted_at):
+        history.save(command)
+    self.assertEqual([("first", 0), ("middle", 2), ("repeat", 3)], self.stored_entries())
+    self.assertEqual(["repeat", "middle", "first"], history.entries())
+    history.save("newest")
+    self.assertEqual(["newest", "repeat", "middle"], history.entries())
+    self.assertEqual(["middle", "repeat", "newest"], [row[0] for row in self.stored_entries()])
+
+  def test_deduplication_preserves_case_whitespace_and_multiline_differences(self) -> None:
+    history = self.open_history()
+    commands = ["select 'A  B';", "SELECT 'A  B';", "select 'A B';", "select\n'A  B';", "select 'A  B'; "]
+    for command in commands + [commands[0]]:
+      history.save(command)
+    self.assertEqual(commands[1:] + commands[:1], [row[0] for row in self.stored_entries()])
+
+  def test_concurrent_writers_keep_one_row_for_each_exact_command(self) -> None:
+    initializer = self.open_history()
+    initializer.close()
+
+    def save_repeatedly(_: int) -> None:
+      history = SubmissionHistory(self.path, 3, False)
+      try:
+        for _ in range(10):
+          history.save("repeat")
+        self.assertIs(history.mode, HistoryMode.PERSISTENT)
+      finally:
+        history.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+      list(executor.map(save_repeatedly, range(2)))
+    self.assertEqual(["repeat"], [row[0] for row in self.stored_entries()])
+
+  def test_failed_insert_rolls_back_duplicate_removal(self) -> None:
+    history = self.open_history()
+    with patch("csql_with_history.cli.time.time", return_value=1000):
+      history.save("repeat")
+    with closing(sqlite3.connect(self.path)) as connection:
+      connection.execute(
+        "CREATE TRIGGER reject_insert BEFORE INSERT ON submissions "
+        "BEGIN SELECT RAISE(ABORT, 'insert failed'); END"
+      )
+      connection.commit()
+    with patch("csql_with_history.cli.time.time", return_value=2000):
+      history.save("repeat")
+    self.assertIs(history.mode, HistoryMode.MEMORY_ONLY)
+    self.assertEqual([("repeat", 1000)], self.stored_entries())
+    self.assertEqual(2000, history.records()[0].submitted_at)
+
+  def test_memory_only_retention_counts_unique_commands(self) -> None:
+    self.path.mkdir()
+    history = self.open_history(limit=3)
+    for command in ("first", "repeat", "middle", "repeat"):
+      history.save(command)
+    self.assertEqual(["repeat", "middle", "first"], history.entries())
+    history.save("newest")
+    self.assertEqual(["newest", "repeat", "middle"], history.entries())
+
+  def test_zero_and_negative_limits_keep_their_existing_meaning(self) -> None:
+    for limit in (0, -1):
+      with self.subTest(limit=limit):
+        history = self.open_history(limit=limit)
+        for command in ("first", "repeat", "repeat"):
+          history.save(command)
+        expected = [] if limit == 0 else ["repeat", "first"]
+        self.assertEqual(expected, history.entries())
+        self.assertEqual(list(reversed(expected)), [row[0] for row in self.stored_entries()])
+        history.close()
 
   def test_unavailable_store_keeps_memory_only_submission_times(self) -> None:
     self.path.mkdir()

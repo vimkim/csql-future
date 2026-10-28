@@ -185,6 +185,10 @@ class SubmissionHistory:
           )
           if "submitted_at" not in self._columns():
             self.connection.execute("ALTER TABLE submissions ADD COLUMN submitted_at REAL")
+          self.connection.execute(
+            "DELETE FROM submissions WHERE id NOT IN "
+            "(SELECT MAX(id) FROM submissions GROUP BY command)"
+          )
       self._refresh_memory()
     except sqlite3.Error as error:
       self._handle_storage_failure(error)
@@ -215,6 +219,7 @@ class SubmissionHistory:
     assert self.connection is not None
     try:
       with self.connection:
+        self.connection.execute("DELETE FROM submissions WHERE command=?", (entry.command,))
         self.connection.execute(
           "INSERT INTO submissions(command, submitted_at) VALUES (?, ?)",
           (entry.command, entry.submitted_at),
@@ -259,6 +264,7 @@ class SubmissionHistory:
     self.memory_entries = [HistoryEntry(command, submitted_at) for command, submitted_at in rows]
 
   def _remember(self, entry: HistoryEntry) -> None:
+    self.memory_entries = [old for old in self.memory_entries if old.command != entry.command]
     self.memory_entries.append(entry)
     if self.limit == 0:
       self.memory_entries = []
@@ -1622,7 +1628,7 @@ Uses the csql executable selected by PATH in your active CUBRID environment.
 
 Wrapper options:
   --history-file PATH   SQLite history file (default: ./.csql_history.sqlite3)
-  --history-limit N     Retain the latest N submissions (default: 10000)
+  --history-limit N     Retain the latest N unique commands (default: 10000)
   --no-history          Recall existing history without saving new submissions
   --no-completion       Disable schema lookups and keep literal Tab input
   --help               Show this help without requiring CUBRID

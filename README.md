@@ -160,11 +160,14 @@ available after restart, and a multiline draft remains one entry with its
 newlines intact. The wrapper stores separate submissions rather than attempting
 to reconstruct csql's command buffer.
 
-Up/Down recall presents identical complete command texts once, in latest-use
-order, while repeated submissions remain separate stored records. Recall only
-changes the editable draft; Enter is still required to submit it. A submission
-whose first character is a space is not retained. `--no-history` neither appends
-nor removes entries, but can browse an existing selected file.
+History retains one entry per exact complete command text, in latest-use order.
+Submitting the same text again replaces its older entry and updates its
+timestamp. Differences in whitespace and capitalization remain separate entries.
+Opening a writable history file removes existing duplicates, keeping each
+command's latest occurrence and its timestamp. Up/Down recall only changes the
+editable draft; Enter is still required to submit it. A submission whose first
+character is a space is not retained. `--no-history` neither appends nor removes
+entries, but can browse an existing selected file.
 
 Ctrl+R search uses the same deduplicated latest-use view. The picker is part of
 the prompt rather than a full-screen interface: it keeps the unfinished draft
@@ -185,10 +188,11 @@ connection target. The default hidden file isolates launch directories; an
 explicit path can share history between them. Already-running wrappers refresh
 committed shared entries when Up starts a new browse or Ctrl+R opens search.
 
-Each saved submission is inserted and pruned in one short SQLite transaction,
-so repeated submissions count toward retention even though recall and search
-display identical command text once. The default keeps the latest 10,000 rows;
-`--history-limit` sets the committing wrapper's limit.
+Each saved submission replaces any exact duplicate, inserts the latest entry,
+and prunes history in one short SQLite transaction. The default keeps the latest
+10,000 unique commands; repeated submissions do not consume extra slots.
+`--history-limit` sets the committing wrapper's limit. Memory-only history uses
+the same deduplication and retention rules.
 
 Writers use WAL journal mode and a 300 ms busy timeout. WAL allows live readers
 alongside a writer, while SQLite serializes writers; the `-wal` and `-shm`
