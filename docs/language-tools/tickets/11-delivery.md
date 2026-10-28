@@ -1,41 +1,42 @@
-# 11: Check installation and the complete delivery matrix
+# 11: 설치와 전체 납품 행렬 검증
 
-**What to build:** Engineers and agents can install local artifacts and reproduce the documented terminal/editor/lint workflows on the qualified platform.
+**한국어** | [English](11-delivery.en.md)
 
-**Blocked by:** 06, 07, 09, 10.
+**구현 결과:** 검증된 플랫폼에서 로컬 산출물을 설치하고 문서의 터미널·편집기·린트 흐름을 재현합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 06, 07, 09, 10.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read the complete [spec](../spec.md), [contracts](../contracts.md), [execution](../execution.md), graph, and all ticket reports.
-Inspect current repository guidance, packaging, and CI before adding aggregate checks.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and every integrated blocker commit.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+전체 [명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md), 그래프·모든 티켓 보고서를 읽습니다.
+통합 검사 추가 전에 현재 저장소 지침·패키징·CI를 확인합니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 통합된 모든 선행 커밋을 제공합니다.
 
-Own aggregate verification recipes/scripts, release-install documentation, and the final support/coverage matrix.
-Update README and packaging metadata only as needed for the completed implementation.
-Use disposable installation environments and local wheel/sdist/VSIX artifacts.
-Preserve the existing user-level wrapper installation.
-Do not publish packages/extensions, push branches, open PRs, or deploy under this ticket's authority.
+## 범위와 소유 파일
 
-## Acceptance criteria
+통합 검증 명령·스크립트, 배포 설치 문서, 최종 지원·문법 범위 행렬을 소유합니다.
+완료한 구현에 필요한 범위에서만 README·패키징 메타데이터를 갱신합니다.
+폐기 가능한 설치 환경과 로컬 wheel·sdist·VSIX를 사용하고 기존 사용자 래퍼 설치를 보존합니다.
+이 티켓의 권한으로 패키지·확장 게시, 브랜치 push, PR 생성·배포를 하지 않습니다.
 
-- [ ] `just test`, `just build`, all native/core/CLI/LSP/corpus checks, and both headless editor checks pass on the combined integration tip.
-- [ ] Add `just test-language` as a documented aggregate. Missing required release/runtime/editor prerequisites fail rather than silently skip.
-- [ ] A clean base wheel install keeps the wrapper dependency-free. Optional LSP installation exposes the documented server with pinned compatible dependencies.
-- [ ] Native worker build/install instructions reproduce the qualified pinned 11.5 profile and include runtime assets/notices.
-- [ ] Built-artifact smoke checks cover stdin/path lint, all exits, CUBRID-specific syntax, and schema-aware completion through both clients.
-- [ ] Shared corpus outcomes and converted diagnostic locations agree across core, CLI, LSP, Neovim, and VS Code.
-- [ ] `.csql`, opted-in `.sql`, and unrelated `.sql` association checks all pass without global dialect changes.
-- [ ] Record actual supported OS, architecture, Python, native profile, Neovim, VS Code, and dependency versions. Other platforms remain unqualified.
-- [ ] Documentation distinguishes syntax coverage, unsupported constructs, catalog snapshots, semantic/style exclusions, and missing-runtime behavior.
-- [ ] Run Standards and Spec review against the exact implementation baseline. Resolve findings and repeat affected checks.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 통합 tip에서 `just test`, `just build`, 네이티브·코어·CLI·LSP·코퍼스와 두 headless 편집기 검사를 통과합니다.
+- [ ] 통합 `just test-language`를 추가·문서화합니다. 필수 릴리스·런타임·편집기 조건 부재는 건너뛰지 않고 실패합니다.
+- [ ] 깨끗한 기본 wheel 설치는 필수 의존성이 없으며 선택 LSP 설치는 호환 버전 고정 의존성으로 문서의 서버를 제공합니다.
+- [ ] 네이티브 빌드·설치 지침으로 고정 11.5 프로파일을 재현하며 런타임 자료·고지를 포함합니다.
+- [ ] 배포 산출물 검사로 stdin/경로 린트, 모든 종료 코드, CUBRID 전용 문법과 두 클라이언트의 스키마 완성을 확인합니다.
+- [ ] 공통 코퍼스 결과와 변환 위치가 코어·CLI·LSP·Neovim·VS Code에서 같습니다.
+- [ ] `.csql`·선택 `.sql`·무관한 `.sql` 연결 검사가 전역 방언 변경 없이 통과합니다.
+- [ ] 실제 OS·아키텍처·Python·네이티브 프로파일·Neovim·VS Code·의존성 버전을 기록합니다. 다른 플랫폼은 미검증으로 둡니다.
+- [ ] 문서가 문법 범위·미지원 구문·스키마 스냅샷·의미/스타일 제외·런타임 부재 동작을 구분합니다.
+- [ ] 정확한 구현 기준으로 Standards·Spec 리뷰를 수행합니다. 지적을 해결하고 영향받은 검사를 반복합니다.
 
-Commit scoped files and record the final matrix, artifact paths/hashes, complete verdicts, review results, and commit in `reports/11.md`.
-Report any remaining merge/publication gate separately from implementation completion.
-The coordinator requests review of the committed result under the user's Git workflow.
+## 근거와 인계
+
+범위만 커밋하고 최종 행렬·산출물 경로/해시·전체 결과·리뷰·커밋을 `reports/11.md`에 기록합니다.
+남은 병합·게시 승인은 구현 완료와 별도로 보고합니다.
+조정자는 사용자 Git 절차에 따라 커밋 결과의 검토를 요청합니다.

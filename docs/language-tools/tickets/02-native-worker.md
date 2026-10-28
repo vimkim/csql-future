@@ -1,48 +1,50 @@
-# 02: Qualify the pinned 11.5 native parser worker
+# 02: 버전을 고정한 11.5 네이티브 파서 워커 검증
 
-**What to build:** A caller can initialize an exact release profile and parse fixed SQL through a separate process without a database.
+**한국어** | [English](02-native-worker.en.md)
 
-**Blocked by:** None.
+**구현 결과:** 정확한 릴리스 프로파일을 초기화하고 DB 없이 별도 프로세스로 고정 SQL을 파싱합니다.
 
-**Status:** specified. Can start immediately under the implementation handoff.
+**선행 조건:** 없음.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 구현 인계 범위에서 바로 시작할 수 있습니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [research](../parser-research.md), and [feasibility](../feasibility.md).
-Read [execution](../execution.md) and the personal CUBRID policies before native builds.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline.
-The existing 11.5 experiment establishes feasibility but does not satisfy production qualification.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [조사](../parser-research.md), [실험](../feasibility.md)을 읽습니다.
+네이티브 빌드 전에 [실행 규칙](../execution.md)과 개인 CUBRID 정책을 읽습니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자가 실제 할당 기준을 제공합니다.
+기존 11.5 실험은 실현 가능성만 확인했으며 운영용 검증을 대신하지 않습니다.
 
-Own a new `native/parser-worker/` build, qualification manifest, and notices.
-Own `src/csql_future/validation/`, including document maps, diagnostics, profile checks, and worker adapter.
-Own `tests/native_parser/` and worker/position tests.
-Define an extensible coverage registry with separate family files for later tickets.
-Include conservative feature predicates and apply them before unaudited native parsing.
-Initial supported coverage is literal SELECT and CREATE SERIAL.
-Do not modify CUBRID's shared source checkout or initialize a database.
-Use a dedicated pinned-source worktree and `cubrid-build` instructions if a build is needed.
-Coordinate `justfile` edits. Do not edit ticket 01's completion module.
+## 범위와 소유 파일
 
-## Acceptance criteria
+새 `native/parser-worker/` 빌드·검증 manifest·고지를 소유합니다.
+문서 위치 맵·진단·프로파일 검사·워커 어댑터가 있는 `src/csql_future/validation/`을 소유합니다.
+`tests/native_parser/`와 워커·위치 테스트를 소유합니다.
+후속 계열별 파일을 갖는 확장 가능한 지원 범위 레지스트리를 정의합니다.
+검토하지 않은 네이티브 파싱 전에 보수적인 구문 조건을 적용합니다.
+초기 지원 범위는 리터럴 SELECT와 CREATE SERIAL입니다.
+공유 CUBRID 체크아웃을 변경하거나 DB를 초기화하지 않습니다.
+빌드가 필요하면 고정 소스 전용 작업 트리와 `cubrid-build` 지침을 사용합니다.
+`justfile` 수정은 조정하며 티켓 01의 완성 모듈은 변경하지 않습니다.
 
-- [ ] Qualify build `11.5.0.2704-cc94778` at source `cc947788d3b7dc402f46192d0f3299ddcc8563ba` with matching headers, library identity, platform, and runtime assets.
-- [ ] Prove valid/invalid CREATE SERIAL, literal SELECT, incomplete input, empty input, and multiple statements through the JSON-lines process interface.
-- [ ] Reject mismatched profiles/libraries and distinguish unavailable runtime, parser rejection, internal errors, and process failure.
-- [ ] Check internal-error flags, ordinary error lists, and partial trees. Never infer success from a non-null tree alone.
-- [ ] Audit executing/catalog-dependent grammar actions and syntax parameters for the initial coverage. Record explicit settings and private initialization paths.
-- [ ] Coverage predicates distinguish literal SELECT from table queries, CTEs, and subqueries before parsing. Unknown forms remain unsupported.
-- [ ] Korean/emoji/CRLF negative fixtures establish native coordinate units or trigger the documented statement-span fallback.
-- [ ] Code-point/byte/UTF-16 conversion checks cover surrogate pairs, boundaries, EOF, and invalid positions.
-- [ ] Native calls remain serialized and outside the caller's protocol event loop. Deadlines kill/reap only the owned worker.
-- [ ] Trace representative parsing with no database connection, submitted-text execution, descendant client, or external writable configuration.
-- [ ] Add documented `just build-native-parser` and `just test-native-parser` recipes with explicit source/runtime inputs. Missing mandatory prerequisites fail visibly.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 소스 `cc947788d3b7dc402f46192d0f3299ddcc8563ba`의 `11.5.0.2704-cc94778`을 일치하는 헤더·라이브러리 식별값·플랫폼·런타임 자료로 검증합니다.
+- [ ] JSON-lines 프로세스 인터페이스로 올바른·잘못된 CREATE SERIAL, 리터럴 SELECT, 미완성·빈 입력·여러 문장을 확인합니다.
+- [ ] 프로파일·라이브러리 불일치를 거부하고 런타임 부재·문법 거부·내부 오류·프로세스 실패를 구분합니다.
+- [ ] 내부 오류 플래그·일반 오류 목록·부분 트리를 확인합니다. 트리 포인터가 있다는 이유만으로 성공으로 판단하지 않습니다.
+- [ ] 초기 범위의 실행·카탈로그 의존 grammar action과 문법 파라미터를 검토합니다. 명시적 설정·전용 초기화 경로를 기록합니다.
+- [ ] 파싱 전 조건으로 리터럴 SELECT와 테이블 쿼리·CTE·서브쿼리를 구분합니다. 알 수 없는 형태는 미지원으로 둡니다.
+- [ ] 잘못된 한글·이모지·CRLF 예제로 네이티브 좌표 단위를 확인하거나 계약의 문장 범위 대체를 사용합니다.
+- [ ] 코드 포인트·바이트·UTF-16 변환은 surrogate pair, 경계, EOF, 잘못된 위치를 검사합니다.
+- [ ] 네이티브 호출은 직렬화하고 호출자의 프로토콜 이벤트 루프 밖에서 실행합니다. 기한 초과 시 소유 워커만 종료·회수합니다.
+- [ ] 대표 파싱 추적으로 DB 접속·입력 SQL 실행·자식 클라이언트·외부 쓰기 설정이 없음을 확인합니다.
+- [ ] 명시적 소스·런타임 입력을 받는 `just build-native-parser`, `just test-native-parser`를 추가·문서화합니다. 필수 조건 부재는 실패로 드러냅니다.
 
-If pinned-build reuse fails, retain the evidence and stop this ticket before asserting support.
-Do not substitute another native build or create a new dialect parser without revising the spec.
-Commit scoped work and record qualification, commands, identities, limitations, and commit in `reports/02.md`.
-This unlocks ticket 03.
+## 근거와 인계
+
+고정 빌드를 재사용하지 못하면 근거를 보존하고 지원을 주장하기 전에 이 티켓을 중지합니다.
+명세 개정 없이 다른 빌드나 새 방언 파서로 대체하지 않습니다.
+범위만 커밋하고 검증·명령·식별값·한계·커밋을 `reports/02.md`에 기록합니다.
+티켓 03의 선행 조건입니다.

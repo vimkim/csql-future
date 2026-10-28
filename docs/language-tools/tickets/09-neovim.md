@@ -1,38 +1,40 @@
-# 09: Deliver configurable Neovim integration
+# 09: 설정 가능한 Neovim 연동
 
-**What to build:** Neovim users get shared completion/diagnostics and basic CUBRID highlighting/indentation for selected files.
+**한국어** | [English](09-neovim.en.md)
 
-**Blocked by:** 05, 08.
+**구현 결과:** 선택한 파일에 공통 완성·진단과 기본 CUBRID 구문 강조·들여쓰기를 제공합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 05, 08.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [execution](../execution.md), and blocker reports.
-Use current primary Neovim documentation for its built-in client APIs.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commits.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md), 선행 보고서를 읽습니다.
+내장 LSP API는 최신 Neovim 공식 문서를 확인합니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own `editors/neovim/`, its headless tests, and its installation/configuration guide.
-Use filetype `cubrid`, a user-configured server argv, built-in LSP, Vim syntax rules, and conservative indentation.
-Default `.csql` association is configurable. `.sql` requires explicit patterns or a local filetype choice.
-Do not implement a Tree-sitter grammar or a second completion engine.
-Do not change the VS Code client or Python server except through separately coordinated defect fixes.
+## 범위와 소유 파일
 
-## Acceptance criteria
+`editors/neovim/`, headless 테스트와 설치·설정 가이드를 소유합니다.
+filetype `cubrid`, 사용자 설정 서버 argv, 내장 LSP, Vim syntax와 보수적인 들여쓰기를 사용합니다.
+기본 `.csql` 연결을 설정할 수 있어야 합니다. `.sql`은 명시적 패턴이나 로컬 filetype 선택이 필요합니다.
+Tree-sitter 문법이나 두 번째 완성 엔진을 구현하지 않습니다.
+별도로 조정한 결함 수정 외에는 VS Code 클라이언트·Python 서버를 변경하지 않습니다.
 
-- [ ] A default `.csql` buffer starts the server and receives shared completion plus serial diagnostics.
-- [ ] An opted-in `.sql` buffer behaves the same. An unrelated `.sql` buffer keeps its prior SQL filetype/client behavior.
-- [ ] Users can disable default associations and configure per-project patterns without global dialect takeover.
-- [ ] Snapshot schema completion, explicit replacements, Unicode locations, document changes, and close cleanup match protocol fixtures.
-- [ ] Lexical rules distinguish keywords, strings, comments, identifiers, and eligible session commands. Basic indentation preserves continuation blocks without claiming full parsing.
-- [ ] A missing native worker leaves completion and highlighting available with explicit diagnostic availability information.
-- [ ] Add `just test-neovim` using headless processes and fresh configurations. Test Neovim 0.11+ APIs without deprecated setup calls.
-- [ ] Document installation, server/runtime prerequisites, association examples, and observed version limits.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 기본 `.csql` 버퍼에서 서버를 시작하고 공통 완성·serial 진단을 받습니다.
+- [ ] 선택 연결한 `.sql`도 같으며 무관한 `.sql`은 기존 SQL filetype·클라이언트 동작을 유지합니다.
+- [ ] 사용자가 기본 연결을 끄고 프로젝트별 패턴을 설정해도 다른 SQL 방언을 전역으로 바꾸지 않습니다.
+- [ ] 스냅샷 완성·명시적 대체·Unicode 위치·문서 변경·닫기 정리가 프로토콜 예제와 같습니다.
+- [ ] 키워드·문자열·주석·식별자·적합한 세션 명령을 어휘 규칙으로 구분합니다. 기본 들여쓰기는 계속되는 블록을 보존하며 전체 파싱을 주장하지 않습니다.
+- [ ] 워커가 없어도 완성·구문 강조를 유지하고 진단 가용성을 명시합니다.
+- [ ] 새 설정의 headless `just test-neovim`을 추가합니다. 폐기된 setup 호출 없이 Neovim 0.11 이상 API를 확인합니다.
+- [ ] 설치·서버/런타임 조건·파일 연결 예제·확인한 버전 한계를 문서화합니다.
 
-Commit scoped files and record headless transcripts, actual Neovim versions, fixture parity, and commit in `reports/09.md`.
-This contributes to ticket 11.
+## 근거와 인계
+
+범위만 커밋하고 headless 기록·실제 Neovim 버전·예제 동등성·커밋을 `reports/09.md`에 기록합니다.
+티켓 11에 반영합니다.

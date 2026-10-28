@@ -1,38 +1,40 @@
-# 05: Load offline schema snapshots in editor sessions
+# 05: 편집기에서 오프라인 스키마 스냅샷 읽기
 
-**What to build:** An editor session obtains schema-aware completion from a configured local metadata snapshot without connecting to CUBRID.
+**한국어** | [English](05-schema-snapshots.en.md)
 
-**Blocked by:** 04.
+**구현 결과:** 편집기가 CUBRID에 접속하지 않고 설정한 로컬 메타데이터 스냅샷으로 스키마 기반 완성을 제공합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 04.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read the schema/configuration contracts, [spec](../spec.md), [execution](../execution.md), and ticket 04's report.
-Read the existing immutable schema values and terminal catalog lifecycle tests.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commit.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+스키마·설정 계약, [명세](../spec.md), [실행 규칙](../execution.md), 티켓 04 보고서를 읽습니다.
+기존 불변 스키마 값과 터미널 카탈로그 수명 테스트를 읽습니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own `src/csql_future/language/snapshots.py`, snapshot fixtures/tests, and snapshot user documentation.
-Own the necessary LSP schema-setting/reload integration.
-Provide a small valid metadata example and a documented conversion example from the current terminal schema value.
-Do not change terminal live-query lifecycle, add automatic live editor connections, or add semantic lint.
-Coordinate edits to shared LSP configuration handlers.
+## 범위와 소유 파일
 
-## Acceptance criteria
+`src/csql_future/language/snapshots.py`, 스냅샷 예제·테스트·사용 문서를 소유합니다.
+필요한 LSP 스키마 설정·재로드 연동을 소유합니다.
+작은 정상 메타데이터 예제와 기존 터미널 스키마 값의 변환 예제를 문서화합니다.
+터미널의 실시간 조회 수명을 바꾸거나 편집기 자동 연결·의미 린트를 추가하지 않습니다.
+공유 LSP 설정 처리기 수정은 조정합니다.
 
-- [ ] Schema v1 snapshots produce relation, owner, alias-column, and quoted-name suggestions through the core and LSP.
-- [ ] Snapshot conversion preserves integrated users, database identity, system flags, and index names. Their command-context suggestions remain available.
-- [ ] No snapshot produces keyword completion and no invented catalog names.
-- [ ] Initial invalid/missing snapshots produce a visible availability message. Failed reloads retain the previous valid snapshot as stale.
-- [ ] An explicit reload or per-document configuration change updates completion without editing the document.
-- [ ] Relative paths and configuration precedence match the contracts. Snapshots contain no credentials or commands.
-- [ ] Syntax validation and its exit status do not depend on the snapshot's presence or contents.
-- [ ] Add `just test-schema-snapshots`. Retain the terminal metadata and PTY regression verdicts.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] v1 스냅샷이 코어·LSP에서 관계·소유자·별칭 컬럼·인용 이름 후보를 제공합니다.
+- [ ] 변환은 통합된 사용자·DB 식별값·시스템 플래그·인덱스 이름을 보존하며 관련 명령 문맥도 완성합니다.
+- [ ] 스냅샷이 없으면 키워드만 제공하고 카탈로그 이름을 지어내지 않습니다.
+- [ ] 초기 파일 부재·오류는 가용성 메시지를 표시합니다. 재로드 실패는 이전 정상 스냅샷과 오래됨 표시를 유지합니다.
+- [ ] 명시적 재로드·문서별 설정 변경으로 본문 편집 없이 완성을 갱신합니다.
+- [ ] 상대 경로·설정 우선순위가 계약과 같으며 스냅샷에 자격 증명·명령이 없습니다.
+- [ ] 스냅샷 유무·내용이 문법 검사와 종료 상태에 영향을 주지 않습니다.
+- [ ] `just test-schema-snapshots`를 추가하고 터미널 메타데이터·PTY 회귀 검증을 유지합니다.
 
-Commit scoped files and record commands, observations, and commit in `reports/05.md`.
-This unlocks tickets 09 and 10 after ticket 08 also completes.
+## 근거와 인계
+
+범위만 커밋하고 명령·관찰·커밋을 `reports/05.md`에 기록합니다.
+티켓 08도 완료되면 09·10을 시작할 수 있습니다.

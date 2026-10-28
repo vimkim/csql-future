@@ -1,237 +1,219 @@
-# Shared CUBRID language tools specification
+# 공통 CUBRID 언어 도구 명세
 
-Status: implementation proposal supported by a narrow feasibility experiment.
-The [contracts](contracts.md) define exact observable behavior.
-The [ticket graph](tickets/README.md) defines implementation scope and order.
+**한국어** | [English](spec.en.md)
 
-## Problem statement
+상태: 제한된 실현 가능성 실험을 근거로 한 구현 제안입니다.
+[계약](contracts.md)은 관찰 가능한 정확한 동작을, [티켓 의존 관계](tickets/README.md)는 구현 범위·순서를 정의합니다.
 
-CUBRID engineers already use the terminal wrapper's history and completion.
-Editors and AI agents cannot reuse these capabilities through a stable interface.
-A generic SQL parser can accept SQL that CUBRID rejects.
-Running a script through CSQL also executes it, which cannot serve as default linting.
+## 해결할 문제
 
-The project needs one completion implementation, explicit CUBRID syntax coverage, and consistent diagnostics across tools.
-The terminal's existing behavior must remain available throughout the change.
+CUBRID 엔지니어는 이미 터미널 래퍼의 히스토리와 완성을 사용합니다.
+편집기·AI 에이전트는 안정적인 인터페이스로 이 기능을 재사용할 수 없습니다.
+일반 SQL 파서는 CUBRID가 거부할 SQL을 허용할 수 있습니다.
+CSQL로 스크립트를 검사하면 실행도 하므로 기본 린트 방법으로 사용할 수 없습니다.
 
-## Solution
+프로젝트에는 단일 완성 구현, 명시적인 CUBRID 문법 지원 범위와 도구 간 일관된 진단이 필요합니다.
+변경 중에도 기존 터미널 동작을 유지해야 합니다.
 
-Keep all packages in this repository.
-Extract the existing completion logic into a pure Python module.
-Retain terminal menu state and catalog process ownership in terminal adapters.
-Add an offline lint command and one language server.
-Connect Neovim and VS Code to that server.
+## 해결 방향
 
-Use a native CUBRID parser worker for strict SQL parsing.
-Run that worker in a separate process with a pinned source/build profile.
-Keep tolerant completion independent of strict parse success.
-An unavailable or unqualified parser produces an explicit failure or unsupported result.
-It never produces a syntax pass.
+모든 패키지를 이 저장소에 둡니다. 기존 완성 로직을 순수 Python 모듈로 추출합니다.
+메뉴 상태와 카탈로그 프로세스 소유권은 터미널 어댑터에 유지합니다.
+오프라인 린트 명령과 언어 서버 하나를 추가하고 Neovim·VS Code를 연결합니다.
 
-The experiment accepted CUBRID serial syntax and rejected a malformed form without connecting to a database.
-It also preserved completion for unfinished SQL.
-See the [feasibility report](feasibility.md) for exact evidence and limitations.
+엄격한 SQL 파싱은 소스·빌드 프로파일을 고정한 별도 네이티브 CUBRID 워커가 수행합니다.
+미완성 입력을 허용하는 완성은 엄격한 파싱 성공과 독립적으로 동작합니다.
+파서가 없거나 검증되지 않았으면 명시적인 실패·미지원 결과를 내며 문법 통과로 처리하지 않습니다.
 
-## User stories
+실험은 DB 접속 없이 올바른 CUBRID serial 문법을 허용하고 잘못된 형태를 거부했습니다.
+미완성 SQL 완성도 유지했습니다. 정확한 근거·한계는 [실험 보고서](feasibility.md)에 있습니다.
 
-1. As a terminal user, I want existing completion and history behavior to survive extraction, so that my workflow continues.
-2. As a library caller, I want text, a cursor, and an optional schema snapshot to produce suggestions without I/O.
-3. As an engineer, I want completion for unfinished SQL, so that parser errors do not prevent editing.
-4. As an engineer, I want table and alias-qualified column suggestions from an offline schema snapshot.
-5. As an engineer, I want existing owner resolution and identifier quoting to remain consistent across clients.
-6. As a Neovim user, I want `.csql` files to enable CUBRID support by default.
-7. As a Neovim user, I want project-specific `.sql` associations without changing other SQL projects.
-8. As a VS Code user, I want a dedicated CUBRID language identifier and configurable file associations.
-9. As an editor user, I want highlighting and basic indentation even when the parser is unavailable.
-10. As an editor user, I want completion replacement ranges to preserve surrounding SQL.
-11. As an editor user, I want stale diagnostics to disappear after document changes or closure.
-12. As a Korean-speaking engineer, I want correct locations around Korean text, emoji, multiline SQL, and CRLF.
-13. As an AI agent, I want a deterministic stdin/path lint command with structured diagnostics.
-14. As an AI agent, I want different exit outcomes for invalid syntax, unsupported coverage, and tool failures.
-15. As an engineer, I want syntax checks to work without a database or credentials.
-16. As an engineer, I want a missing table to remain distinct from invalid grammar.
-17. As an engineer, I want the tool to identify the exact parser build and selected dialect settings.
-18. As an engineer, I want unsupported CSQL commands and PL/CSQL bodies reported explicitly.
-19. As an engineer, I want mixed script boundaries to preserve original diagnostic offsets.
-20. As a maintainer, I want shared positive, negative, and incomplete fixtures across CLI and editor checks.
-21. As a maintainer, I want one bounded ticket per fresh agent, so that work remains resumable across sessions.
-22. As a user, I want installation instructions to distinguish the terminal package, editor dependencies, and native parser runtime.
+## 사용자 요구
 
-## Implementation decisions
+1. 터미널 사용자는 추출 후에도 기존 완성·히스토리 흐름을 유지할 수 있어야 합니다.
+2. 라이브러리 호출자는 본문·커서·선택적 스키마 스냅샷으로 I/O 없이 후보를 받아야 합니다.
+3. 문법 오류가 편집을 막지 않도록 미완성 SQL도 완성해야 합니다.
+4. 오프라인 스냅샷에서 테이블·별칭 한정 컬럼을 제안해야 합니다.
+5. 소유자 해석·식별자 인용 규칙이 클라이언트마다 같아야 합니다.
+6. Neovim의 `.csql`은 기본으로 CUBRID 지원을 켜야 합니다.
+7. Neovim에서 다른 SQL 프로젝트를 바꾸지 않고 프로젝트별 `.sql` 연결이 가능해야 합니다.
+8. VS Code는 전용 CUBRID 언어 ID와 설정 가능한 파일 연결을 제공해야 합니다.
+9. 파서가 없어도 구문 강조·기본 들여쓰기는 동작해야 합니다.
+10. 완성 대체 범위가 주변 SQL을 보존해야 합니다.
+11. 문서 변경·닫기 후 오래된 진단을 제거해야 합니다.
+12. 한글·이모지·여러 줄·CRLF 주변의 위치가 정확해야 합니다.
+13. 에이전트는 stdin·경로 입력과 구조화된 진단이 있는 결정적 린트 명령을 사용해야 합니다.
+14. 문법 오류·미지원·도구 실패의 종료 결과가 달라야 합니다.
+15. DB·자격 증명 없이 문법을 검사해야 합니다.
+16. 없는 테이블과 잘못된 문법을 구분해야 합니다.
+17. 정확한 파서 빌드·선택한 방언 설정을 식별해야 합니다.
+18. 미지원 CSQL 명령·PL/CSQL 본문을 명시해야 합니다.
+19. 혼합 스크립트 경계를 처리해도 원문 진단 오프셋을 유지해야 합니다.
+20. CLI·편집기 검증은 공통 정상·오류·미완성 예제를 사용해야 합니다.
+21. 세션을 넘어 재개할 수 있도록 새 에이전트마다 범위를 제한한 티켓 하나를 맡겨야 합니다.
+22. 설치 문서는 터미널 패키지·편집기 의존성·네이티브 런타임을 구분해야 합니다.
 
-### Modules and responsibilities
+## 구현 결정
 
-| Module | Interface responsibility | Hidden implementation |
+### 모듈과 책임
+
+| 모듈 | 인터페이스 책임 | 내부 구현 |
 | --- | --- | --- |
-| Completion core | Suggest replacements for document text, cursor, profile, and optional immutable schema | Tolerant tokenization, context, aliases, quoting, ordering |
-| Syntax validator | Validate a document under an exact supported profile | Script classification, worker lifecycle, parser results, diagnostic conversion |
-| Catalog adapter | Publish immutable schema snapshots | Existing CSQL metadata query, timeout, refresh, standalone lifecycle |
-| Language server | Convert document events into core calls and protocol results | Document versions, scheduling, cancellation, client positions |
-| Editor adapters | Associate files and start the configured language server | Editor configuration, lexical highlighting, indentation |
+| 완성 코어 | 본문·커서·프로파일·선택적 불변 스키마로 대체 후보 제안 | 허용적 토큰화·문맥·별칭·인용·정렬 |
+| 문법 검증기 | 정확히 지원하는 프로파일로 문서 검사 | 스크립트 분류·워커 수명·파서 결과·진단 변환 |
+| 카탈로그 어댑터 | 불변 스키마 스냅샷 제공 | 기존 CSQL 조회·시간 제한·갱신·독립 모드 수명 |
+| 언어 서버 | 문서 이벤트를 코어 호출·프로토콜 결과로 변환 | 문서 버전·스케줄링·취소·클라이언트 위치 |
+| 편집기 어댑터 | 파일 연결과 설정된 언어 서버 시작 | 편집기 설정·어휘 기반 강조·들여쓰기 |
 
-Tests call these same interfaces.
-The completion core creates no processes and reads no environment variables.
-The validator owns native worker failures.
-Editor adapters contain no second SQL completion or validation implementation.
+테스트도 같은 인터페이스를 사용합니다.
+완성 코어는 프로세스를 만들거나 환경 변수를 읽지 않습니다.
+검증기는 워커 실패를 책임집니다. 편집기 어댑터에 별도 SQL 완성·검증 구현을 두지 않습니다.
 
-### Architecture
+### 구조
 
-The terminal, lint CLI, and language server call the Python language modules.
-Completion consumes document text and an optional schema snapshot.
-The validator sends parse requests to the native worker.
-Neovim and VS Code communicate with the same language server.
-Highlighting and indentation use editor-native lexical rules in the first release.
-Those rules do not establish syntax validity.
+터미널·린트 CLI·언어 서버는 Python 언어 모듈을 호출합니다.
+완성은 본문과 선택적 스키마를 읽고 검증기는 워커에 파싱을 요청합니다.
+Neovim·VS Code는 같은 서버와 통신합니다.
+첫 배포의 구문 강조·들여쓰기는 편집기 자체 어휘 규칙을 사용하며 문법 유효성을 입증하지 않습니다.
 
-### Runtime and packaging
+### 런타임과 패키징
 
-Retain Python 3.10+ and zero mandatory Python runtime dependencies for the wrapper and completion core.
-The lint CLI uses the standard library and the separately installed native worker.
-The language server uses an optional `lsp` dependency group with pygls 2.x.
-Pin a tested version and its transitive dependencies during implementation.
-The inspected pygls manifest requires Python 3.9+ and lists Python 3.10 through 3.14 among its targets.
-This supports feasibility, not an untested compatibility promise. [Upstream manifest](https://raw.githubusercontent.com/openlawlibrary/pygls/main/pyproject.toml).
+래퍼·완성 코어는 Python 3.10 이상과 필수 Python 런타임 의존성 0개를 유지합니다.
+린트 CLI는 표준 라이브러리와 별도 설치 워커를 사용합니다.
+서버는 선택적 `lsp` 의존성 그룹의 pygls 2.x를 사용합니다.
+구현 중 검증한 버전과 전이 의존성을 고정합니다.
+조사한 pygls manifest는 Python 3.9 이상을 요구하고 대상에 3.10–3.14를 열거합니다.
+이는 실현 가능성 근거이며 미검증 호환성 약속이 아닙니다.
+[업스트림 manifest](https://raw.githubusercontent.com/openlawlibrary/pygls/main/pyproject.toml).
 
-Build the worker against a qualified CUBRID client library and matching source headers.
-Keep private native types behind the worker's process interface.
-Do not require changes to the user's installed database server.
-Do not vendor the full CUBRID repository into this project.
-Record runtime library hashes, source commit, native version, settings, notices, and platform in a qualification manifest.
+검증한 CUBRID 클라이언트 라이브러리와 일치하는 소스 헤더로 워커를 빌드합니다.
+내부 네이티브 타입은 프로세스 인터페이스 뒤에 숨깁니다.
+사용자의 DB 서버를 변경하거나 전체 CUBRID 저장소를 이 프로젝트에 복사하지 않습니다.
+검증 manifest에 런타임 라이브러리 해시·소스 커밋·버전·설정·고지·플랫폼을 기록합니다.
 
-Initial end-to-end support is Linux x86-64.
-Neovim uses its built-in client with version 0.11+ as the initial API target.
-VS Code uses a desktop or Linux remote extension host with a user-installed Python/server command.
-The extension must declare a minimum VS Code version tested against its selected language-client version.
-Windows, macOS, browser-hosted VS Code, native ARM builds, and bundled parser downloads require separate qualification.
+초기 전체 경로 지원은 Linux x86-64입니다. Neovim은 내장 클라이언트와 0.11 이상 API를 대상으로 합니다.
+VS Code는 사용자 설치 Python·서버 명령을 사용하는 데스크톱 또는 Linux remote extension host를 대상으로 합니다.
+확장은 선택한 language-client와 함께 검사한 최소 VS Code 버전을 선언해야 합니다.
+Windows·macOS·브라우저 VS Code·네이티브 ARM·파서 자동 다운로드는 별도 검증이 필요합니다.
 
-### CUBRID version and coverage
+### CUBRID 버전과 문법 범위
 
-The user selected CUBRID 11.5 before 11.4.
-The first qualification target is development build `11.5.0.2704-cc94778`, source commit `cc947788d3b7dc402f46192d0f3299ddcc8563ba`.
-Use profile ID `cubrid-11.5.0.2704-cc94778`.
-The experiment establishes narrow feasibility on that build.
-Ticket 02 must qualify the production worker before dependent syntax work can complete.
-Failure of that experiment blocks syntax delivery and requires revising the decision with evidence.
-The experiment alone cannot satisfy the release gate.
-Other 11.5 builds and CUBRID 11.4 need new profiles and qualification records.
-The current source checkout's newer 11.5 HEAD is not the same parser build.
-There is no automatic “closest version” fallback.
+사용자는 11.4보다 CUBRID 11.5를 먼저 선택했습니다.
+첫 대상은 개발 빌드 `11.5.0.2704-cc94778`, 소스 `cc947788d3b7dc402f46192d0f3299ddcc8563ba`입니다.
+프로파일 ID는 `cubrid-11.5.0.2704-cc94778`입니다.
+실험은 이 빌드의 제한된 실현 가능성만 확인했습니다.
+종속 문법 작업 완료 전에 티켓 02에서 운영용 워커를 검증해야 합니다.
+해당 실험 실패는 문법 납품을 막으며 근거와 함께 결정을 개정해야 합니다.
+기존 실험만으로 배포 조건을 충족하지 않습니다.
+다른 11.5 빌드·11.4에는 새 프로파일·검증 기록이 필요합니다.
+더 최신인 로컬 소스 HEAD도 같은 파서 빌드가 아닙니다. 가까운 버전으로 자동 대체하지 않습니다.
 
-Use UTF-8, explicit quote rules, and a fixed string-escape setting in each profile.
-The first profile matches `parser_parse_string_with_escapes(..., false)` and explicitly configured native defaults.
-Ticket 02 records every syntax-relevant parameter read by the qualified path.
-Unknown settings cannot silently inherit machine configuration.
+각 프로파일은 UTF-8, 명시적 인용 규칙과 고정 문자열 이스케이프 설정을 사용합니다.
+첫 프로파일은 `parser_parse_string_with_escapes(..., false)`와 명시적으로 설정한 기본값에 맞춥니다.
+티켓 02는 해당 경로가 읽는 모든 문법 관련 파라미터를 기록합니다.
+알 수 없는 설정을 호스트 환경에서 조용히 상속하지 않습니다.
 
-Coverage grows through native statement kinds, conservative feature predicates, and fixtures.
-Statement kind alone is insufficient because literal SELECT and complex queries share a native kind.
-Before native parsing, admit only forms whose reachable grammar actions were audited.
-Unknown forms produce unsupported coverage.
-This prefilter controls coverage only and cannot produce a syntax pass without native parsing.
-The first vertical slice supports literal SELECT and CREATE SERIAL.
-Tickets 06 and 07 qualify the following release scope:
+범위는 네이티브 문장 종류·보수적인 구문 조건·예제로 확대합니다.
+리터럴 SELECT와 복잡한 쿼리는 같은 종류이므로 종류만으로 충분하지 않습니다.
+네이티브 파싱 전에 도달 가능한 grammar action을 검토한 형태만 허용합니다.
+알 수 없는 형태는 미지원입니다. 사전 필터는 범위만 정하며 네이티브 파싱 없이 통과를 반환하지 못합니다.
+첫 통합 경로는 리터럴 SELECT·CREATE SERIAL을 지원합니다.
+티켓 06·07은 다음 배포 범위를 검증합니다.
 
-| Scope | Included behavior | Limits |
+| 범위 | 포함 동작 | 제약 |
 | --- | --- | --- |
-| Queries and DML | SELECT, CTEs/subqueries, joins, expressions, INSERT, UPDATE, DELETE, MERGE | Syntax only; result-column inference for CTE completion remains deferred |
-| Schema | CREATE/ALTER/DROP TABLE, VIEW, INDEX, SERIAL | Other object kinds remain unsupported until explicitly qualified |
-| Engineer commands | SHOW, DESCRIBE/DESC, EXPLAIN where present in the selected release, EVALUATE, statistics, tracing, transaction/settings statements | Release-valid spellings come from pinned source/manual evidence, not this list alone |
-| CSQL script commands | Exact `;help`, `;exit`, and `;autocommit on/off` lines | Validate spelling/arguments only; no session behavior executes |
-| Unsupported script constructs | Other CSQL commands, external shell commands, includes, delimiter changes, PL/CSQL routine bodies | Return unsupported coverage; do not skip them and claim a complete pass |
+| 쿼리·DML | SELECT, CTE·서브쿼리, 조인·표현식, INSERT, UPDATE, DELETE, MERGE | 문법만 검사. CTE 완성의 결과 컬럼 추론은 후속 |
+| 스키마 | CREATE/ALTER/DROP TABLE, VIEW, INDEX, SERIAL | 다른 객체는 명시적 검증 전까지 미지원 |
+| 엔지니어 명령 | 릴리스에 있는 SHOW, DESCRIBE/DESC, EXPLAIN, EVALUATE, 통계·trace·트랜잭션·설정 | 실제 표기는 고정 소스·매뉴얼 근거 필요 |
+| CSQL 스크립트 명령 | 정확한 `;help`, `;exit`, `;autocommit on/off` 줄 | 표기·인자만 검사하며 세션 동작은 실행하지 않음 |
+| 미지원 스크립트 | 다른 CSQL·외부 셸·include·구분자 변경·PL/CSQL 본문 | 미지원 반환. 생략 후 완전 통과로 처리하지 않음 |
 
-This table selects work, not an assertion that every listed spelling exists in the pinned 11.5 build.
-The coverage registry records native kinds, feature predicates, grammar productions, and reachable-action audits.
-An unavailable statement in the selected release cannot enter its supported registry.
-Every entry requires valid/invalid fixtures and an audit for catalog-dependent or executing grammar actions.
-Syntax success certifies parser-stage acceptance within that registry and profile.
-It does not certify catalog resolution, privileges, types, data constraints, or execution success.
+이 표는 작업 범위이며 모든 표기가 고정 빌드에 존재한다는 주장이 아닙니다.
+레지스트리는 문장 종류·조건·생성 규칙·도달 가능한 action 검토를 기록합니다.
+선택 릴리스에 없는 문장은 지원 레지스트리에 넣을 수 없습니다.
+모든 항목에는 정상·오류 예제와 카탈로그·실행 의존 action 검토가 필요합니다.
+문법 성공은 해당 범위·프로파일의 파서 단계 통과만 인증합니다.
+카탈로그 해석·권한·타입·데이터 제약·실행 성공은 인증하지 않습니다.
 
-### Existing terminal behavior and concurrent work
+### 기존 터미널과 병행 작업
 
-Preserve existing menu navigation, replacement, bypass, history, and catalog lifecycle contracts.
-Keep client/server background refresh and sequential standalone snapshot preparation.
-The extraction must include any completion extensions integrated by work 568 before implementation begins.
-Do not freeze the older SHOW-only behavior as the permanent baseline.
-No ticket modifies or integrates the other session's branch on its behalf.
-Work 568 completed during planning and entered `main` as `99d49e13698b609ff4885a418578f7f50485e82f`.
-That integration adds command contexts, generated vocabulary, and schema fields for indexes, users, system relations, and database identity.
-The vocabulary records 11.4 manual provenance and must retain that provenance during extraction.
-Its presence does not certify 11.5 syntax coverage.
+메뉴 이동·대체·직접 전달·히스토리·카탈로그 수명 계약을 보존합니다.
+클라이언트/서버 백그라운드 갱신과 순차 독립 스냅샷을 유지합니다.
+구현 시작 전 작업 568에서 통합된 완성 확장도 추출 범위에 포함합니다.
+이전 SHOW 전용 동작을 영구 기준으로 고정하지 않습니다.
+다른 세션 대신 그 브랜치를 수정·통합하지 않습니다.
+계획 중 작업 568이 main의 `99d49e13698b609ff4885a418578f7f50485e82f`로 통합되었습니다.
+명령 문맥·생성 어휘와 인덱스·사용자·시스템 관계·DB 식별 필드가 추가되었습니다.
+어휘의 11.4 매뉴얼 출처는 추출 시 보존해야 하며 그 존재가 11.5 문법 검증을 뜻하지 않습니다.
 
-Initial mandatory completion covers the integrated terminal baseline: keywords, relations, owners, quoting, aliases, columns, and supported command contexts.
-CTE result-column inference, derived-table columns, correlated outer references, and synonyms remain later completion work.
-The strict parser can support these constructs before completion understands their result schemas.
+필수 초기 완성은 통합 터미널 기준의 키워드·관계·소유자·인용·별칭·컬럼·지원 명령 문맥입니다.
+CTE 결과 추론·파생 컬럼·상관 외부 참조·동의어는 후속입니다.
+완성이 결과 스키마를 이해하기 전에도 엄격한 파서는 해당 구문을 지원할 수 있습니다.
 
-### Catalogs and offline use
+### 카탈로그와 오프라인 사용
 
-Completion works without a schema snapshot and without a native worker.
-Syntax validation works without a database and does not request a schema snapshot.
-Editor v1 accepts an optional local schema snapshot file.
-Its version, configured path, parse errors, stale status, and explicit reload behavior remain visible.
-It contains schema metadata only, never credentials.
-Live catalog queries remain available through the existing terminal adapter.
-Automatic live database connections from editors are deferred.
-Missing catalog data never becomes a syntax error.
-No semantic lint or style rules are enabled in this release.
+완성은 스키마·네이티브 워커 없이도 동작합니다.
+문법 검사는 DB 없이 동작하며 스키마 스냅샷을 요구하지 않습니다.
+편집기 v1은 선택적 로컬 스냅샷 파일을 받습니다.
+버전·경로·파싱 오류·오래된 상태·명시적 재로드를 사용자가 확인할 수 있어야 합니다.
+스냅샷에는 메타데이터만 있고 자격 증명은 없습니다.
+실시간 조회는 기존 터미널 어댑터에 유지하며 편집기 자동 연결은 후속입니다.
+메타데이터 부재는 문법 오류가 아닙니다. 이 배포에서 의미·스타일 린트는 활성화하지 않습니다.
 
-### Editor associations
+### 편집기 파일 연결
 
-Use a distinct `cubrid` filetype/language identifier.
-Associate `.csql` by default.
-Allow users to disable that default or add patterns.
-Do not claim `.sql` globally.
-Use workspace/user `files.associations` in VS Code and configurable filetype patterns in Neovim.
-Associate opted-in `.sql` files with the same `cubrid` identifier.
-Preserve other SQL projects and existing explicit user associations.
+별도 `cubrid` filetype·언어 ID를 사용합니다.
+`.csql`은 기본 연결하며 사용자가 해제하거나 패턴을 추가할 수 있어야 합니다.
+`.sql` 전체를 전역으로 연결하지 않습니다.
+VS Code는 workspace/user `files.associations`, Neovim은 설정 가능한 filetype 패턴을 사용합니다.
+선택한 `.sql`은 같은 `cubrid` ID를 사용합니다. 다른 SQL 프로젝트와 사용자 명시 연결을 보존합니다.
 
-VS Code can start a server implemented in another language, and its settings support per-workspace associations.
-Neovim supplies a built-in LSP client.
-These are the integration mechanisms selected here. [VS Code server guide](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide), [file associations](https://code.visualstudio.com/docs/languages/overview), [Neovim LSP](https://neovim.io/doc/user/lsp.html).
+VS Code는 다른 언어의 서버 실행과 workspace별 연결을 지원합니다.
+Neovim은 내장 LSP 클라이언트를 제공합니다. 이 설계가 선택한 연동 방법입니다.
+[VS Code 서버 가이드](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide),
+[파일 연결](https://code.visualstudio.com/docs/languages/overview), [Neovim LSP](https://neovim.io/doc/user/lsp.html).
 
-### Interfaces and failure behavior
+### 인터페이스와 실패
 
-Adopt the [contracts](contracts.md) before client implementation.
-The core uses immutable input and output values with Unicode code-point offsets.
-All source spans are half-open.
-Worker and editor position conversions preserve the original document text.
+클라이언트 구현 전에 [계약](contracts.md)을 적용합니다.
+불변 입출력 값·Unicode 코드 포인트 오프셋·반열린 원문 범위를 사용합니다.
+워커·편집기 위치 변환은 원문을 보존합니다.
+문법 오류·미지원·도구 실패를 구분하고 미지원 문장·파서 부재에 `valid`를 반환하지 않습니다.
+CLI는 모든 입력 결과와 결정적 통합 종료 우선순위를 제공합니다.
+서버도 같은 진단 코드와 변환 범위를 사용합니다. 네이티브 충돌·시간 초과가 완성을 막지 않습니다.
 
-Keep syntax errors, unsupported coverage, and tool failures separate.
-Never emit `valid` for a document with unsupported statements or an unavailable parser.
-The lint CLI reports all input files and uses a deterministic aggregate exit priority.
-The language server uses the same diagnostic codes and converted spans.
-Native crashes and timeouts never block completion.
+## 테스트 결정
 
-## Testing decisions
+내부 함수를 따라 쓰는 대신 관찰 가능한 계약을 검사합니다.
+기존 완성·메타데이터·외부 프로세스·PTY 검사를 회귀 근거로 유지합니다.
+릴리스 식별값·기대 상태·범위를 갖는 공통 코퍼스를 추가합니다.
+각 문법 계열은 정상·의도적 오류·미완성 예제를 포함합니다.
 
-Use observable contracts instead of tests that mirror internal helper functions.
-Retain the current completion, metadata, external-process, and PTY tests as regression evidence.
-Add a shared corpus with release identity, expected status, and diagnostic spans.
-Every syntax family includes valid, deliberately invalid, and incomplete examples.
+첫 통합 경로는 워커·린트 CLI·LSP를 통한 CUBRID serial 진단과
+순수 코어·LSP의 미완성 본문 완성을 확인해야 합니다.
+범위 확대·편집기 패키징 전에 이 경로를 통과합니다.
 
-The first vertical slice must show a CUBRID serial diagnostic through the worker, lint CLI, and LSP.
-It must also complete unfinished text through both the pure core and LSP.
-Do this before broad syntax coverage or editor packaging.
+한글·이모지·CRLF·빈 줄·EOF와 기존 진단 앞의 편집을 검사합니다.
+같은 예제의 CLI·코어 범위를 클라이언트 범위와 비교합니다.
+워커 버전 불일치·런타임 부재·잘못된 출력·충돌·기한·오래된 응답을 검사합니다.
+실행하지 않는 고정 DDL·DML로 격리를 확인합니다.
+기존 터미널 어댑터만 읽기 전용 격리 카탈로그 예제를 사용합니다.
 
-Test offsets around Korean characters, emoji, CRLF, empty lines, EOF, and edits before an existing diagnostic.
-Compare CLI/core spans with client ranges for the same fixtures.
-Test wrong-version workers, missing runtimes, malformed worker output, crashes, deadlines, and stale responses.
-Use fixed nonexecuting DDL/DML text to test containment.
-Use read-only isolated catalog fixtures only when checking the existing terminal adapter.
+Neovim은 `.csql`·선택 `.sql`·무관한 `.sql`을 headless로 확인합니다.
+VS Code는 headless extension-host와 VSIX 패키징을 확인합니다.
+깨끗한 환경에 배포 산출물을 설치하고, 실제 통과 후에만 플랫폼·프로파일 지원을 표시합니다.
 
-Verify Neovim headlessly for `.csql`, opted-in `.sql`, and unrelated `.sql` files.
-Verify the VS Code extension with headless extension-host tests and VSIX packaging.
-Run installation checks from built artifacts in clean environments.
-Only mark a supported platform/profile after these checks actually pass.
+## 제외 범위
 
-## Out of scope
+계획 세션은 운영용 언어 도구를 구현하지 않습니다.
+첫 배포에는 새 Tree-sitter 문법, PL/CSQL 검사, 포매팅, 리팩터링,
+편집기 실시간 연결, 의미·스타일 린트를 포함하지 않습니다.
+패키지·확장 게시와 추가 저장소도 제외합니다.
+모든 릴리스의 전체 CUBRID 문법 적합성을 주장하지 않습니다.
 
-This session implements no production language tool.
-The release scope excludes a new Tree-sitter grammar, PL/CSQL validation, formatting, refactoring, live editor connections, and semantic/style lint.
-It also excludes package/extension publication and additional repositories.
-Full CUBRID syntax conformance across all releases is not a release claim.
+## 추가 자료
 
-## Further notes
-
-The [parser research](parser-research.md) compares native reuse, Tree-sitter, SQLGlot, and ANTLR.
-The chosen split follows that evidence and the narrow native experiment.
-The [execution rules](execution.md) govern integration and fresh-agent assignments.
-The ticket files remain the local task graph; this planning session creates no external issues.
+[파서 조사](parser-research.md)는 네이티브 재사용·Tree-sitter·SQLGlot·ANTLR를 비교합니다.
+선택한 분리는 해당 근거와 제한된 네이티브 실험을 따릅니다.
+[실행 규칙](execution.md)은 통합·새 에이전트 할당을 정합니다.
+티켓은 로컬 작업 그래프이며 계획 세션에서 외부 이슈는 생성하지 않습니다.

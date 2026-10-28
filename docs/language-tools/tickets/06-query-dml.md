@@ -1,41 +1,44 @@
-# 06: Qualify queries and DML through CLI and LSP
+# 06: CLI와 LSP에서 쿼리·DML 문법 검증
 
-**What to build:** Engineers and agents can check the selected release's query/DML syntax offline through the existing CLI and server.
+**한국어** | [English](06-query-dml.en.md)
 
-**Blocked by:** 04.
+**구현 결과:** 엔지니어와 에이전트가 기존 CLI·서버를 통해 선택 릴리스의 쿼리·DML 문법을 오프라인으로 검사합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 04.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [research](../parser-research.md), [execution](../execution.md), and reports 02–04.
-Consult the pinned 11.5 grammar and local manual for concrete syntax fixtures.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commits.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [조사](../parser-research.md),
+[실행 규칙](../execution.md), 보고서 02–04를 읽습니다.
+구체적인 문법 예제는 고정 11.5 문법과 로컬 매뉴얼을 확인합니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자가 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own a query/DML coverage-family registry file and `tests/corpus/query-dml/`.
-Own its coverage audit and contract-level CLI/LSP regression checks.
-Qualify SELECT, CTE/subquery, join/expression, INSERT, UPDATE, DELETE, and MERGE parser paths.
-Reuse the native grammar. Do not implement a second grammar.
-Do not add CTE result-column inference or other new completion semantics.
-Shared native-adapter changes require a coordinator-owned serialization slot.
+## 범위와 소유 파일
 
-## Acceptance criteria
+쿼리·DML 지원 계열 레지스트리 파일과 `tests/corpus/query-dml/`을 소유합니다.
+해당 범위 검토와 계약 수준 CLI·LSP 회귀 검사를 소유합니다.
+SELECT, CTE·서브쿼리, 조인·표현식, INSERT, UPDATE, DELETE, MERGE 파서 경로를 검증합니다.
+네이티브 문법을 재사용하며 두 번째 문법은 구현하지 않습니다.
+CTE 결과 컬럼 추론 등 새 완성 의미는 추가하지 않습니다.
+공유 네이티브 어댑터 수정에는 조정자가 관리하는 직렬 작업 순서가 필요합니다.
 
-- [ ] Each included native statement kind has valid, invalid, and incomplete fixtures plus a recorded grammar-action audit.
-- [ ] Extend pre-parse feature predicates only for audited query paths. Shared native kinds cannot bypass coverage restrictions.
-- [ ] CUBRID-specific query expressions and quoted identifiers use source/manual-backed fixtures.
-- [ ] Missing table/column names do not require a database or become syntax errors solely because they are absent.
-- [ ] Nested expressions, CTEs, subqueries, comments, strings containing semicolons, and multiple statements preserve diagnostic source mapping.
-- [ ] CLI and LSP produce equivalent statuses/codes and converted locations for the same corpus.
-- [ ] Executing/catalog-dependent paths remain unsupported until their safe parser-only handling is proven.
-- [ ] Supported production coverage is explicit. Fixtures alone do not imply all CUBRID releases are supported.
-- [ ] Add `just test-query-syntax`, including representative no-connection/no-execution observations.
-- [ ] Shared completion and initial vertical-slice checks remain green.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 포함하는 각 네이티브 문장 종류에 정상·오류·미완성 예제와 grammar action 검토 기록이 있습니다.
+- [ ] 검토한 쿼리 경로만 파싱 전 조건에 추가합니다. 같은 네이티브 종류라는 이유로 제한을 우회하지 않습니다.
+- [ ] CUBRID 전용 쿼리 표현식·인용 식별자 예제에 소스·매뉴얼 근거가 있습니다.
+- [ ] 없는 테이블·컬럼 때문에 DB를 요구하거나 부재만으로 문법 오류가 되지 않습니다.
+- [ ] 중첩 표현식·CTE·서브쿼리·주석·세미콜론 포함 문자열·여러 문장의 원문 진단 위치를 유지합니다.
+- [ ] 같은 코퍼스의 CLI·LSP 상태·코드·변환 위치가 같습니다.
+- [ ] 실행·카탈로그 의존 경로는 안전한 파싱 전용 처리를 입증하기 전까지 미지원입니다.
+- [ ] 운영 지원 범위를 명시합니다. 예제만으로 모든 CUBRID 릴리스 지원을 주장하지 않습니다.
+- [ ] 접속·실행 없음의 대표 관찰을 포함한 `just test-query-syntax`를 추가합니다.
+- [ ] 공통 완성과 첫 통합 경로 검사가 계속 통과합니다.
 
-Commit scoped files and record grammar references, corpus verdicts, native identity, and commit in `reports/06.md`.
-This contributes to ticket 11's release matrix.
+## 근거와 인계
+
+범위만 커밋하고 문법 참조·코퍼스 결과·네이티브 식별값·커밋을 `reports/06.md`에 기록합니다.
+티켓 11의 배포 행렬에 반영합니다.

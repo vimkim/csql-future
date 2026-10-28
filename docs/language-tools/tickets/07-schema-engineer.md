@@ -1,39 +1,41 @@
-# 07: Qualify schema and engineer commands
+# 07: 스키마와 엔지니어 명령 검증
 
-**What to build:** Engineers can check selected schema and CUBRID diagnostic/maintenance command syntax without running those commands.
+**한국어** | [English](07-schema-engineer.en.md)
 
-**Blocked by:** 04.
+**구현 결과:** 선택한 스키마·CUBRID 진단·유지보수 명령의 문법을 실행 없이 검사합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 04.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [execution](../execution.md), and reports 02–04.
-Use the pinned source and manual to identify release-valid command spellings.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commits.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md), 보고서 02–04를 읽습니다.
+고정 소스·매뉴얼로 릴리스에서 유효한 명령 표기를 확인합니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own schema/engineer coverage-family registry files and `tests/corpus/schema-engineer/`.
-Qualify TABLE, VIEW, INDEX, SERIAL DDL and the spec's release-valid engineer command kinds.
-Do not change terminal completion behavior or add stored-routine validation.
-Do not execute DDL, tracing, statistics, configuration, or transaction text as an oracle.
-Shared native-adapter changes require a coordinator-owned serialization slot.
+## 범위와 소유 파일
 
-## Acceptance criteria
+스키마·엔지니어 지원 계열 레지스트리와 `tests/corpus/schema-engineer/`를 소유합니다.
+TABLE·VIEW·INDEX·SERIAL DDL과 명세의 릴리스 유효 명령 종류를 검증합니다.
+터미널 완성을 바꾸거나 저장 루틴 검사를 추가하지 않습니다.
+검사 기준을 얻기 위해 DDL·trace·통계·설정·트랜잭션 본문을 실행하지 않습니다.
+공유 네이티브 어댑터 수정에는 조정자가 관리하는 직렬 작업 순서가 필요합니다.
 
-- [ ] Every included native statement kind has source/manual evidence, valid/invalid/incomplete fixtures, and a grammar-action audit.
-- [ ] Extend pre-parse feature predicates only for audited schema/command paths. Reject unknown forms before unaudited parsing.
-- [ ] SHOW, DESCRIBE/DESC, EXPLAIN, EVALUATE, statistics, tracing, and transaction/settings forms are included only where the selected release supports them.
-- [ ] Missing schema objects do not trigger a database lookup during syntax validation.
-- [ ] `CREATE`/`ALTER`/`DROP` fixtures remain parser input only. Representative traces show no client execution or database access.
-- [ ] Parser contextual/internal failures remain separate from ordinary syntax rejection.
-- [ ] Unqualified object kinds or commands produce unsupported coverage instead of an unqualified pass.
-- [ ] CLI and LSP agree on statuses, codes, and mapped spans, including Unicode identifiers.
-- [ ] Add `just test-engineer-syntax`. Shared worker and vertical-slice checks remain green.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 각 네이티브 문장 종류에 소스·매뉴얼 근거, 정상·오류·미완성 예제와 grammar action 검토가 있습니다.
+- [ ] 검토한 스키마·명령 경로만 파싱 전 조건에 추가합니다. 알 수 없는 형태는 미검토 파싱 전에 거부합니다.
+- [ ] SHOW, DESCRIBE/DESC, EXPLAIN, EVALUATE, 통계·trace·트랜잭션·설정은 선택 릴리스가 지원할 때만 포함합니다.
+- [ ] 없는 스키마 객체 때문에 문법 검사 중 DB를 조회하지 않습니다.
+- [ ] `CREATE`·`ALTER`·`DROP`은 파서 입력으로만 사용하며 대표 추적에 클라이언트 실행·DB 접근이 없습니다.
+- [ ] 문맥·내부 파서 실패를 일반 문법 거부와 구분합니다.
+- [ ] 미검증 객체 종류·명령은 근거 없는 통과 대신 미지원입니다.
+- [ ] Unicode 식별자를 포함해 CLI·LSP 상태·코드·변환 범위가 같습니다.
+- [ ] `just test-engineer-syntax`를 추가하고 공통 워커·통합 경로 검사를 유지합니다.
 
-Commit scoped files and record audited productions, omissions, corpus verdicts, and commit in `reports/07.md`.
-This contributes to ticket 11's release matrix.
+## 근거와 인계
+
+범위만 커밋하고 검토한 생성 규칙·제외 항목·코퍼스 결과·커밋을 `reports/07.md`에 기록합니다.
+티켓 11의 배포 행렬에 반영합니다.

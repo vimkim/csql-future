@@ -1,41 +1,43 @@
-# 03: Lint paths and stdin through the qualified parser
+# 03: 검증된 파서로 파일과 표준 입력 린트
 
-**What to build:** An AI agent can check serial/literal-query files or stdin offline and distinguish syntax, coverage, and tool outcomes.
+**한국어** | [English](03-lint-cli.en.md)
 
-**Blocked by:** 02.
+**구현 결과:** AI 에이전트가 serial·리터럴 쿼리 파일과 표준 입력을 오프라인으로 검사하고 문법·미지원·도구 결과를 구분합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 02.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [contracts](../contracts.md), [spec](../spec.md), [execution](../execution.md), and ticket 02's report.
-Read the [starter corpus](../corpus.json).
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and worker qualification commit.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[계약](../contracts.md), [명세](../spec.md), [실행 규칙](../execution.md), 티켓 02 보고서를 읽습니다.
+[시작 코퍼스](../corpus.json)를 읽습니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 워커 검증 커밋을 제공합니다.
 
-Own `src/csql_future/lint.py`, lint/config tests, and CLI user documentation.
-Add the `cubrid-lint` entry point with a serialized `pyproject.toml` edit.
-Own project configuration parsing and explicit CLI overrides under `validation/`.
-Do not broaden native syntax coverage beyond ticket 02.
-Unknown CSQL commands and PL/CSQL must already yield unsupported coverage.
-Do not add editor code, style rules, semantic checks, recursive file scans, or SQL execution.
+## 범위와 소유 파일
 
-## Acceptance criteria
+`src/csql_future/lint.py`, 린트·설정 테스트, CLI 사용 문서를 소유합니다.
+`pyproject.toml` 수정을 직렬화해 `cubrid-lint` 진입점을 추가합니다.
+`validation/`의 프로젝트 설정 해석과 명시적 CLI 덮어쓰기를 소유합니다.
+네이티브 문법 범위는 티켓 02를 넘기지 않습니다.
+알 수 없는 CSQL 명령과 PL/CSQL은 이 단계에서도 미지원이어야 합니다.
+편집기 코드·스타일 규칙·의미 검사·재귀 파일 검색·SQL 실행은 추가하지 않습니다.
 
-- [ ] Path input, one stdin operand, multiple files, final EOF without newline, and human/JSON output satisfy the contracts.
-- [ ] Valid/invalid serial and literal SELECT fixtures have the documented statuses and codes.
-- [ ] Unicode/CRLF diagnostics preserve original source spans. JSON declares code-point offsets explicitly.
-- [ ] Invalid UTF-8, NUL, unreadable input, invalid arguments/configuration, oversized input, and missing/crashing worker produce exit 3.
-- [ ] Unsupported coverage produces exit 2. Syntax errors produce exit 1. Fully checked valid input produces exit 0.
-- [ ] Mixed-file errors use priority 3, then 1, then 2, then 0, while retaining every document result.
-- [ ] Private logs never contaminate JSON stdout. Default operation requests no database or credentials.
-- [ ] `.csql` defaults to CSQL mode. Other files/stdin default to SQL mode. Explicit mode overrides work.
-- [ ] Add `just test-lint` with external-process assertions against the installed entry point.
-- [ ] `just build` succeeds and the built artifact includes the entry point and required profile resources.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 경로·표준 입력 한 번·여러 파일·마지막 줄바꿈 없는 EOF·사람용/JSON 출력이 계약을 충족합니다.
+- [ ] 올바른·잘못된 serial·리터럴 SELECT 예제는 정해진 상태·코드를 반환합니다.
+- [ ] Unicode·CRLF 진단은 원문 범위를 유지하며 JSON은 코드 포인트 오프셋임을 명시합니다.
+- [ ] 잘못된 UTF-8·NUL·읽기 실패·인자/설정 오류·크기 초과·워커 부재/충돌은 종료 3입니다.
+- [ ] 미지원은 종료 2, 문법 오류는 1, 완전히 검사한 정상 입력은 0입니다.
+- [ ] 여러 파일은 모든 결과를 보존하고 3, 1, 2, 0 순서의 우선순위를 사용합니다.
+- [ ] 전용 로그가 JSON stdout에 섞이지 않으며 기본 동작은 DB·자격 증명을 요구하지 않습니다.
+- [ ] `.csql`은 CSQL 모드, 다른 파일·표준 입력은 SQL 모드가 기본이며 명시적 모드가 우선합니다.
+- [ ] 설치 진입점을 외부 프로세스로 확인하는 `just test-lint`를 추가합니다.
+- [ ] `just build`를 통과하고 배포 파일에 진입점과 필수 프로파일 자료가 들어갑니다.
 
-Commit scoped files and record acceptance evidence, runtime identity, and commit in `reports/03.md`.
-This unlocks ticket 04 after ticket 01 completes.
+## 근거와 인계
+
+범위만 커밋하고 완료 조건 근거·런타임 식별값·커밋을 `reports/03.md`에 기록합니다.
+티켓 01도 완료되면 티켓 04를 시작할 수 있습니다.

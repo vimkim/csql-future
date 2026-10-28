@@ -1,57 +1,23 @@
-# README visuals
+# README 화면 자료
 
-The static SVGs use the editor's Catppuccin-inspired colors: background
-`#1e1e2e`, text `#cdd6f4`, prompt `#cba6f7`, keys `#89b4fa`, and muted labels
-`#a6adc8`. The title uses the SQL prompt and cursor as its visual motif.
+**한국어** | [English](README.en.md)
 
-`hero.svg` is a hand-authored vector title. `history.svg` and `completion.svg`
-render text captured from the actual installed editor through the project's PTY
-test harness. The history and `employees` catalog are illustrative fixtures;
-no live database, user history, or credentials are used. Terminal text is kept
-in order, with blank outer rows cropped and restrained highlighting applied.
+정적 SVG는 편집기의 Catppuccin 계열 색상을 사용합니다.
+배경은 `#1e1e2e`, 본문은 `#cdd6f4`, 프롬프트는 `#cba6f7`,
+키는 `#89b4fa`, 보조 설명은 `#a6adc8`입니다. 제목은 SQL 프롬프트와 커서를 모티프로 사용합니다.
 
-Regenerate the captures from the repository root:
+`hero.svg`는 직접 작성한 벡터 제목입니다.
+`history.svg`와 `completion.svg`는 프로젝트 PTY 테스트 도구로 실제 설치된 편집기를 실행해
+캡처한 본문을 렌더링합니다. 히스토리와 `employees` 카탈로그는 설명용 테스트 데이터입니다.
+실제 DB·사용자 히스토리·자격 증명을 사용하지 않습니다.
+터미널 본문의 순서를 유지하고 바깥 빈 행을 자른 뒤 필요한 강조만 적용합니다.
+
+저장소 루트에서 캡처를 재생성합니다.
 
 ```bash
 uv run python tests/capture_readme.py
 ```
 
-Preview the SVGs at 900-pixel desktop and 360-pixel mobile widths. The README
-also explains every demonstrated action in Markdown so scaled terminal text
-is supplementary on small screens. The SVGs have no external fonts, scripts,
-embedded raster images, or animation.
-
-## Live demodb recording
-
-`demodb-demo.gif` records the actual editor against CUBRID's populated sample
-database in standalone mode. Its editable terminal source is `demodb-demo.cast`
-(asciicast v2). It uses the same palette as the SVGs, DejaVu Sans Mono, an
-88-column by 24-row terminal, and pauses at the completion menus.
-
-The sequence is: launch `csql-future -S -u dba --no-pager demodb`; complete
-`s` to `SELECT`; open the hint menu and filter with `PARA`; accept `PARALLEL`
-and add `(2)`; complete `athlete` after `FROM`; return to the SELECT list and
-complete `name` and `code`; execute with `LIMIT 3`; complete `;plan detail`;
-quit with `;exit`. The query only reads sample data, and `;plan` changes a
-session setting. A temporary directory keeps the recording's query history
-separate from personal history.
-
-To record again, load a CUBRID environment with `csql` on PATH and an existing,
-populated `demodb` that is available for standalone access. Install this project
-with `just sync`, install [agg](https://github.com/asciinema/agg), and make the
-DejaVu Sans Mono font available. Then run from the repository root:
-
-```bash
-python3 tools/record_readme_demo.py
-```
-
-The script uses editor code from this checkout and fails if expected menus or
-query results do not appear. It does not create a database or manage servers.
-It overwrites only `demodb-demo.cast` and `demodb-demo.gif` in this directory;
-use `--output-dir /tmp/csql-demo` to preview another recording.
-
-To replay the captured session without a database, use:
-
-```bash
-asciinema play assets/readme/demodb-demo.cast
-```
+너비 900px의 데스크톱과 360px의 모바일 환경에서 SVG를 확인하세요.
+README는 시연 동작을 Markdown으로도 설명하므로 작은 화면에서 축소된 터미널 본문은 보조 자료로 사용합니다.
+자료에는 외부 글꼴·스크립트·내장 래스터 이미지·애니메이션이 없습니다.

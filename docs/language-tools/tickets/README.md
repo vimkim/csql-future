@@ -1,49 +1,49 @@
-# Implementation ticket graph
+# 구현 티켓 의존 관계
 
-Status: eleven local tickets are specified. None is implemented.
-No external issues were created.
-The [spec](../spec.md), [contracts](../contracts.md), and [execution rules](../execution.md) apply to every ticket.
+**한국어** | [English](README.en.md)
 
-| ID | Ticket | Blocked by | Observable delivery |
+상태: 계획 기준 시점에 로컬 티켓 11개를 정의했으며 구현하지 않았습니다.
+외부 이슈는 생성하지 않았습니다.
+[명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md)을 모든 티켓에 적용합니다.
+
+| ID | 티켓 | 선행 조건 | 관찰 가능한 결과 |
 | --- | --- | --- | --- |
-| 01 | [Extract reusable completion without terminal regressions](01-completion-core.md) | E01 completion reconciliation | Pure completion callers and unchanged terminal behavior |
-| 02 | [Qualify the pinned 11.5 native parser worker](02-native-worker.md) | None | Database-free parsing through a version-checked process |
-| 03 | [Lint paths and stdin through the qualified parser](03-lint-cli.md) | 02 | Agent CLI with explicit results, Unicode spans, and exit codes |
-| 04 | [Prove completion and syntax diagnostics through LSP](04-lsp-slice.md) | 01, 03 | First full worker/core/CLI/LSP vertical slice |
-| 05 | [Load offline schema snapshots in editor sessions](05-schema-snapshots.md) | 04 | Schema-aware editor completion without a database |
-| 06 | [Qualify queries and DML through CLI and LSP](06-query-dml.md) | 04 | Query/DML diagnostics with catalog-independent behavior |
-| 07 | [Qualify schema and engineer commands](07-schema-engineer.md) | 04 | DDL and CUBRID-specific command diagnostics |
-| 08 | [Check mixed CSQL boundaries without session effects](08-script-boundaries.md) | 04 | Supported session lines and explicit unsupported constructs |
-| 09 | [Deliver configurable Neovim integration](09-neovim.md) | 05, 08 | Completion, diagnostics, highlighting, indentation, and file associations |
-| 10 | [Deliver configurable VS Code extension](10-vscode.md) | 05, 08 | Same shared features through a packaged VSIX |
-| 11 | [Check installation and the complete delivery matrix](11-delivery.md) | 06, 07, 09, 10 | Reproducible local artifacts and end-to-end acceptance |
+| 01 | [터미널 회귀 없이 공통 완성 추출](01-completion-core.md) | E01 완성 통합 확인 | 순수 완성 호출과 기존 터미널 동작 |
+| 02 | [버전 고정 11.5 네이티브 파서 워커 검증](02-native-worker.md) | 없음 | 버전을 확인한 프로세스를 통한 DB 없는 파싱 |
+| 03 | [검증된 파서로 파일·표준 입력 린트](03-lint-cli.md) | 02 | 결과·Unicode 범위·종료 코드가 명시된 CLI |
+| 04 | [LSP 완성·문법 진단의 첫 통합 경로](04-lsp-slice.md) | 01, 03 | 워커·코어·CLI·LSP 전체 경로 |
+| 05 | [편집기에 오프라인 스키마 스냅샷 로드](05-schema-snapshots.md) | 04 | DB 접속 없이 스키마 기반 편집기 완성 |
+| 06 | [CLI·LSP의 쿼리·DML 문법 검증](06-query-dml.md) | 04 | 카탈로그와 독립적인 쿼리·DML 진단 |
+| 07 | [스키마·엔지니어 명령 검증](07-schema-engineer.md) | 04 | DDL·CUBRID 전용 명령 진단 |
+| 08 | [세션 효과 없는 혼합 CSQL 경계 검사](08-script-boundaries.md) | 04 | 지원 세션 줄과 명시적인 미지원 구문 |
+| 09 | [설정 가능한 Neovim 연동](09-neovim.md) | 05, 08 | 완성·진단·구문 강조·들여쓰기·파일 연결 |
+| 10 | [설정 가능한 VS Code 확장](10-vscode.md) | 05, 08 | 같은 공통 기능을 제공하는 VSIX |
+| 11 | [설치와 전체 납품 행렬 검증](11-delivery.md) | 06, 07, 09, 10 | 재현 가능한 로컬 산출물과 전체 경로 검증 |
 
-E01 is the external state described in the execution rules.
-It completed in main commit `99d49e1` during planning.
-Ticket 01 can proceed when its actual integration baseline contains that result.
-Ticket 02 remains independent of the completion baseline.
-Ticket 04 must pass before broad syntax work or editor packaging.
-Tickets 05–08 can run concurrently with separate ownership after ticket 04.
-Tickets 09 and 10 can then run concurrently.
+E01은 실행 규칙의 외부 상태입니다. 계획 중 main 커밋 `99d49e1`에서 완료되었습니다.
+티켓 01의 실제 통합 기준에 이 결과가 있으면 진행할 수 있습니다.
+티켓 02는 완성 기준과 독립적입니다.
+범위 확대나 편집기 패키징 전에 티켓 04를 통과해야 합니다.
+그 뒤 소유 범위를 분리한 05–08을 병렬로 수행할 수 있고, 이어 09·10도 병렬로 수행할 수 있습니다.
 
-The first two tickets establish necessary seams and qualification evidence.
-Later tickets deliver narrow, observable behavior through the existing interfaces.
-Native coverage tickets qualify existing grammar families. They do not implement an entire grammar.
+첫 두 티켓은 필요한 모듈 경계와 검증 근거를 마련합니다.
+후속 티켓은 기존 인터페이스로 범위를 제한한 관찰 가능한 동작을 제공합니다.
+네이티브 범위 티켓은 기존 문법 계열을 검증하며 전체 문법을 새로 구현하지 않습니다.
 
-## Assignment and completion records
+## 할당과 완료 기록
 
-The coordinator records the exact integration baseline before each dispatch.
-Use one fresh-context agent and one isolated worktree per ticket.
-Write reports under `tickets/reports/<ID>.md` during implementation.
-Each report must map every acceptance criterion to a command, observation, and commit.
-Update ticket status only after the coordinator verifies integration.
+조정자는 할당 전에 정확한 통합 기준 커밋을 기록합니다.
+티켓마다 새 문맥 에이전트 하나와 격리 작업 트리 하나를 사용합니다.
+구현 보고서는 `tickets/reports/<ID>.md`에 작성합니다.
+모든 완료 조건을 명령·관찰 결과·커밋과 연결해야 합니다.
+조정자가 통합을 확인한 뒤에만 티켓 상태를 갱신합니다.
 
-The [JSON graph](graph.json) is the machine-readable dependency snapshot.
-Every listed acceptance recipe is a future implementation requirement.
-The planning session did not create those recipes.
+[JSON 그래프](graph.json)는 기계가 읽는 의존 관계 스냅샷입니다.
+티켓의 검증 명령은 앞으로 추가할 구현 요구사항입니다. 계획 세션에서는 만들지 않았습니다.
 
-## Deferred work
+## 후속 범위
 
-Later tickets can add CTE/derived-result completion, live editor catalogs, PL/CSQL, Tree-sitter, semantic/style lint, or other platforms.
-Those are not hidden acceptance requirements for these eleven tickets.
-Other 11.5 builds and CUBRID 11.4 require separate profiles and corpus runs.
+CTE·파생 결과 완성, 편집기 실시간 카탈로그, PL/CSQL, Tree-sitter,
+의미·스타일 린트와 다른 플랫폼은 후속 티켓으로 추가할 수 있습니다.
+이 11개 티켓에 숨겨진 완료 조건이 아닙니다.
+다른 11.5 빌드와 11.4에는 별도 프로파일과 코퍼스 실행이 필요합니다.

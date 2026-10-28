@@ -1,237 +1,205 @@
-# Language tool contracts, revision 1
+# 언어 도구 계약, 개정 1
 
-These are implementation requirements.
-No entry point in this document is available at the planning baseline.
-See the [spec](spec.md) for scope and the [tickets](tickets/README.md) for delivery order.
+**한국어** | [English](contracts.en.md)
 
-## Text and positions
+이 문서는 구현 요구사항입니다. 계획 기준 시점에는 여기의 진입점을 사용할 수 없습니다.
+범위는 [명세](spec.md), 납품 순서는 [티켓](tickets/README.md)을 참고합니다.
 
-The core accepts a Unicode string containing the original text.
-Its offsets count Unicode code points from zero.
-A span `[start, end)` includes `start` and excludes `end`.
-Both offsets must satisfy `0 <= start <= end <= len(text)`.
-Completion cursor offsets use the same convention.
+## 본문과 위치
 
-Do not normalize Unicode, newline spelling, case, or whitespace before mapping offsets.
-In CRLF, CR and LF occupy separate code points.
-The next logical line starts after LF.
-Protocol positions exclude the line terminator.
-Positions inside a CRLF terminator are invalid external input.
-The adapter rejects them rather than altering the document.
+코어는 원문을 담은 Unicode 문자열을 받습니다. 오프셋은 0부터 세는 Unicode 코드 포인트입니다.
+`[start, end)`는 `start`를 포함하고 `end`를 제외하며
+`0 <= start <= end <= len(text)`를 만족해야 합니다. 완성 커서도 같은 규칙입니다.
 
-Build explicit per-document maps among code-point offsets, UTF-8 byte offsets, and UTF-16 protocol positions.
-Never use a native byte column directly as an editor character index.
-Reject offsets inside a multibyte UTF-8 sequence or UTF-16 surrogate pair.
-Use zero-based lines internally and in LSP.
-Human CLI locations use one-based line and code-point column.
+위치를 매핑하기 전에 Unicode·줄바꿈·대소문자·공백을 정규화하지 않습니다.
+CRLF의 CR·LF는 별도 코드 포인트이며 다음 논리 줄은 LF 뒤에서 시작합니다.
+프로토콜 위치는 줄 종결자를 제외합니다. CRLF 종결자 내부 위치는 잘못된 외부 입력입니다.
+어댑터는 문서를 고치는 대신 해당 위치를 거부합니다.
 
-LSP v1 negotiates UTF-16 and uses UTF-16 when the client omits position encodings.
-Do not advertise UTF-8 support before implementing and testing it.
-The completion edit replaces the entire selected token span, including the suffix after the cursor.
-An empty span inserts at the cursor.
+문서별로 코드 포인트·UTF-8 바이트·UTF-16 프로토콜 위치의 명시적 맵을 만듭니다.
+네이티브 바이트 열을 편집기 문자 인덱스로 직접 사용하지 않습니다.
+멀티바이트 UTF-8 시퀀스·UTF-16 surrogate pair 내부 오프셋은 거부합니다.
+내부·LSP 줄은 0부터, 사람용 CLI 줄·코드 포인트 열은 1부터 셉니다.
 
-Native error coordinates are private adapter input.
-Ticket 02 must measure their units against the selected build.
-If native data cannot identify a reliable token, use a statement span with `rangePrecision: statement`.
-For EOF errors, a zero-length EOF span is allowed.
-Do not present an estimated token range as exact.
+LSP v1은 UTF-16을 협상하며 클라이언트가 인코딩을 생략해도 UTF-16을 사용합니다.
+구현·검사 전에는 UTF-8 지원을 공표하지 않습니다.
+완성은 커서 뒤 접미부를 포함한 선택 토큰 전체를 대체합니다. 빈 범위는 커서에 삽입합니다.
 
-Example text `가😀x\r\nSELECT 1;` places `x` at code-point offset 2, UTF-8 byte offset 7, and UTF-16 character 3.
-The second line starts at code-point offset 5 and UTF-8 byte offset 10.
+네이티브 오류 좌표는 어댑터 내부 입력입니다. 티켓 02에서 선택 빌드의 단위를 측정합니다.
+신뢰할 토큰을 식별하지 못하면 `rangePrecision: statement`와 문장 범위를 사용합니다.
+EOF 오류에는 길이 0인 EOF 범위를 허용합니다. 추정 토큰 범위를 정확한 값처럼 표시하지 않습니다.
 
-## Completion interface
+`가😀x\r\nSELECT 1;`에서 `x`는 코드 포인트 2, UTF-8 바이트 7, UTF-16 문자 3입니다.
+두 번째 줄은 코드 포인트 5, UTF-8 바이트 10에서 시작합니다.
 
-`complete(text, cursor, profile, schema=None)` returns one immutable result.
-The result contains a replacement span, ordered items, an allowed flag, and optional availability information.
-Each item contains insertion text, a label, and a kind/detail.
-Caller-supplied schema values preserve the integrated terminal schema, including users, database identity, system flags, and indexes.
+## 완성 인터페이스
 
-Calls perform no filesystem, network, subprocess, environment, or terminal operations.
-The same inputs produce the same ordered output.
-Incomplete SQL remains eligible for completion.
-Comments and string contents suppress SQL completion.
-Session-command completion follows the integrated terminal baseline.
-Unknown schema data limits suggestions without inventing names.
+`complete(text, cursor, profile, schema=None)`는 불변 결과 하나를 반환합니다.
+결과에는 대체 범위·정렬된 항목·허용 플래그·선택적 가용성 정보가 있습니다.
+각 항목은 삽입 본문·표시 이름·종류/상세를 포함합니다.
+호출자가 준 스키마는 통합 터미널의 사용자·DB 식별값·시스템 플래그·인덱스를 보존합니다.
 
-The existing `suggest` entry point remains as a compatibility adapter during migration.
-Terminal menu state remains outside this interface.
-Catalog acquisition remains outside this interface.
+파일시스템·네트워크·하위 프로세스·환경·터미널 작업을 수행하지 않습니다.
+같은 입력에는 같은 순서의 결과를 반환합니다. 미완성 SQL도 완성 대상입니다.
+주석·문자열 내용에서는 SQL 완성을 억제합니다. 세션 명령은 통합 터미널 기준을 따릅니다.
+알 수 없는 스키마는 후보를 제한하며 이름을 만들어내지 않습니다.
 
-## Validation interface
+기존 `suggest`는 마이그레이션 중 호환 어댑터로 유지합니다.
+터미널 메뉴 상태·카탈로그 수집은 이 인터페이스 밖에 둡니다.
 
-`validate(text, profile, script_mode)` returns status, coverage, profile identity, and diagnostics.
-The validator accepts document text only.
-It never accepts a database connection or executes submitted text.
-Profile selection is explicit and does not depend on a database server version probe.
+## 검증 인터페이스
 
-| Status | Required meaning |
+`validate(text, profile, script_mode)`는 상태·지원 범위·프로파일 식별값·진단을 반환합니다.
+문서 본문만 받고 DB 연결을 받거나 입력을 실행하지 않습니다.
+프로파일은 명시적으로 선택하며 DB 서버 버전 조회에 의존하지 않습니다.
+
+| 상태 | 필수 의미 |
 | --- | --- |
-| `valid` | Every statement belongs to qualified coverage and passes the selected parser-stage checks |
-| `syntax-error` | At least one supported statement has a parser-stage syntax error |
-| `unsupported` | No syntax error occurred, but some language/version coverage is unsupported |
-| `tool-error` | Input acquisition, configuration, initialization, or worker operation failed |
+| `valid` | 모든 문장이 검증된 범위이며 선택한 파서 단계 검사를 통과 |
+| `syntax-error` | 지원 문장 중 하나 이상이 파서 단계 문법 오류 |
+| `unsupported` | 문법 오류는 없으나 일부 언어·버전 범위가 미지원 |
+| `tool-error` | 입력 수집·설정·초기화·워커 동작 실패 |
 
-Coverage is `complete` only when every statement can be checked under the selected profile.
-Otherwise it is `partial` or `none`.
-Syntax errors and unsupported regions can coexist in one result.
-Preserve both diagnostics.
-Apply status priority `tool-error > syntax-error > unsupported > valid`.
-Parser failure must not erase earlier errors or return a partial pass.
+모든 문장을 선택 프로파일로 검사할 수 있을 때만 범위는 `complete`입니다.
+그 외에는 `partial`·`none`입니다. 문법 오류와 미지원 영역은 함께 있을 수 있으며 두 진단을 보존합니다.
+상태 우선순위는 `tool-error > syntax-error > unsupported > valid`입니다.
+파서 실패로 이전 오류를 지우거나 부분 통과를 반환하지 않습니다.
 
-An empty document passes only after input validity and profile/worker availability checks succeed.
-Unterminated comments and quoted tokens are syntax errors.
-Reject NUL and invalid UTF-8 input as tool input errors before calling NUL-terminated native interfaces.
-Do not silently truncate them.
+빈 문서도 입력·프로파일·워커 가용성 검사 후에만 통과합니다.
+닫히지 않은 주석·인용 토큰은 문법 오류입니다.
+NUL 종결 네이티브 인터페이스 호출 전에 NUL·잘못된 UTF-8을 도구 입력 오류로 거부합니다.
+조용히 잘라 처리하지 않습니다.
 
-## Diagnostic values
+## 진단 값
 
-Each diagnostic contains `code`, `severity`, `message`, `span`, `rangePrecision`, and `category`.
-Keep codes stable and messages descriptive.
-Native message text may differ by release and is not a machine decision key.
-Sort by document input order, span start, span end, then code.
-Deduplicate only identical diagnostic values.
+각 진단은 `code`, `severity`, `message`, `span`, `rangePrecision`, `category`를 포함합니다.
+코드는 안정적으로 유지하고 메시지는 상황을 설명합니다.
+네이티브 메시지는 릴리스별로 달라질 수 있으므로 기계 판정 키로 사용하지 않습니다.
+입력 문서 순서·범위 시작·범위 끝·코드 순으로 정렬합니다. 완전히 같은 진단 값만 중복 제거합니다.
 
-| Code | Category | Severity | Meaning |
+| 코드 | 분류 | 심각도 | 의미 |
 | --- | --- | --- | --- |
-| `CUBRID-S1001` | `syntax` | `error` | Parser-stage syntax rejection |
-| `CUBRID-U1001` | `unsupported` | `warning` | Unknown or mismatched parser profile/version |
-| `CUBRID-U1002` | `unsupported` | `warning` | Statement/script construct outside qualified coverage |
-| `CUBRID-T1001` | `tool` | `error` | Worker/runtime unavailable |
-| `CUBRID-T1002` | `tool` | `error` | Worker crash, timeout, bad response, or initialization failure |
-| `CUBRID-T1003` | `tool` | `error` | Input/configuration/encoding/size failure |
+| `CUBRID-S1001` | `syntax` | `error` | 파서 단계 문법 거부 |
+| `CUBRID-U1001` | `unsupported` | `warning` | 알 수 없거나 불일치하는 파서 프로파일·버전 |
+| `CUBRID-U1002` | `unsupported` | `warning` | 검증 범위 밖 문장·스크립트 구문 |
+| `CUBRID-T1001` | `tool` | `error` | 워커·런타임 부재 |
+| `CUBRID-T1002` | `tool` | `error` | 워커 충돌·시간 초과·잘못된 응답·초기화 실패 |
+| `CUBRID-T1003` | `tool` | `error` | 입력·설정·인코딩·크기 오류 |
 
-Warnings for unsupported coverage still prevent a successful lint exit.
-No semantic/style diagnostic category is enabled in v1.
-Internal parser errors and catalog-dependent grammar failures cannot become ordinary syntax errors without a verified classification.
-Use tool failure or unsupported coverage when appropriate.
+미지원 경고도 성공 종료를 막습니다. v1은 의미·스타일 진단 분류를 활성화하지 않습니다.
+검증된 분류 근거 없이 내부 오류·카탈로그 의존 grammar 실패를 일반 문법 오류로 바꾸지 않습니다.
+적절한 도구 실패·미지원 결과를 사용합니다.
 
-## Native worker process interface
+## 네이티브 워커 프로세스 인터페이스
 
-The production worker is a compiled executable with a narrow JSON-lines protocol.
-It is not the planning experiment's direct ctypes loader.
-Requests and responses use UTF-8 and include `protocolVersion: 1` and a request `id`.
-One worker processes requests serially.
-The client sends one outstanding request per worker.
+운영 워커는 제한된 JSON-lines 프로토콜을 사용하는 컴파일 실행 파일입니다.
+계획 실험의 직접 ctypes 로더가 아닙니다.
+UTF-8 요청·응답에는 `protocolVersion: 1`과 요청 `id`가 있습니다.
+워커는 요청을 직렬 처리하고 클라이언트는 워커당 미완료 요청 하나만 보냅니다.
 
-`initialize` selects a qualified profile and returns native version, source commit, settings, platform, manifest digest, and supported statement kinds.
-It also identifies the revision of the coverage predicates.
-Reject profile/runtime/manifest mismatches before parsing.
-`parse` accepts text and returns diagnostics, coverage decisions, and parsed statement kinds for admitted forms.
-Apply conservative coverage predicates before traversing native grammar actions.
-A native statement kind cannot distinguish a literal SELECT from a complex query.
-Audit the full reachable parser path for each admitted subset or family.
-Unknown forms return unsupported coverage without entering unaudited native paths.
-Coverage classification never replaces native syntax checking.
-`shutdown` closes the worker.
-There is no execute, connect, catalog lookup, file-include, or shell operation.
-The worker calls parser creation, parsing, error collection, and cleanup only, after controlled initialization.
+`initialize`는 검증된 프로파일을 선택하고 버전·소스 커밋·설정·플랫폼·manifest digest·지원 문장 종류를 반환합니다.
+지원 조건의 개정도 식별합니다. 파싱 전에 프로파일·런타임·manifest 불일치를 거부합니다.
+`parse`는 본문을 받고 허용한 형태의 진단·범위 판정·파싱 문장 종류를 반환합니다.
+네이티브 grammar action에 진입하기 전에 보수적 지원 조건을 적용합니다.
+문장 종류만으로 리터럴 SELECT와 복잡한 쿼리를 구분하지 못합니다.
+허용한 하위 범위·계열마다 도달 가능한 전체 파서 경로를 검토합니다.
+알 수 없는 형태는 미검토 경로에 진입하지 않고 미지원으로 반환합니다.
+범위 분류는 네이티브 문법 검사를 대신하지 않습니다. `shutdown`은 워커를 종료합니다.
+실행·접속·카탈로그 조회·파일 include·셸 연산은 없습니다.
+통제된 초기화 후 파서 생성·파싱·오류 수집·정리만 호출합니다.
 
-Use an explicit runtime prefix and trusted executable path.
-Do not find an arbitrary library through PATH or inherited library search settings.
-Create private writable configuration/log/temp paths.
-Ignore ambient CUBRID configuration and database registries.
-The qualification manifest identifies the runtime dependencies and explicit syntax settings.
-Native globals remain private to that worker.
-Process separation is failure isolation, not an operating-system sandbox claim.
+명시적 런타임 prefix와 신뢰한 실행 파일 경로를 사용합니다.
+PATH·상속한 라이브러리 검색 설정에서 임의 라이브러리를 찾지 않습니다.
+전용 쓰기 가능 설정·로그·임시 경로를 만들고 주변 CUBRID 설정·DB 레지스트리는 무시합니다.
+검증 manifest는 런타임 의존성과 명시적 문법 설정을 식별합니다.
+네이티브 전역 상태는 워커 안에 둡니다.
+프로세스 분리는 실패 격리이며 운영체제 sandbox를 보장하지 않습니다.
 
-Set a default 5-second parse deadline, 8 MiB UTF-8 document limit, 16 MiB response limit, and 256-diagnostic limit.
-Expose trusted configuration overrides with positive bounded validation.
-If a diagnostic limit prevents a complete result, return `tool-error` with truncation stated explicitly.
-Kill and reap only the worker owned by this client after timeout or cancellation.
-Do not retry failed SQL silently.
-Completion remains usable while the worker starts, parses, or fails.
+기본 제한은 파싱 5초, UTF-8 문서 8MiB, 응답 16MiB, 진단 256개입니다.
+신뢰한 설정의 덮어쓰기는 양수·상한 검증을 거칩니다.
+진단 제한 때문에 전체 결과를 못 내면 잘림을 명시한 `tool-error`를 반환합니다.
+시간 초과·취소 후 이 클라이언트가 소유한 워커만 종료·회수합니다.
+실패한 SQL을 조용히 재시도하지 않습니다. 시작·파싱·실패 중에도 완성을 사용할 수 있어야 합니다.
 
-## Schema snapshot
+## 스키마 스냅샷
 
-Editor v1 reads optional JSON with `schemaVersion: 1`, `user`, and `relations`.
-Each relation contains `owner`, `name`, `kind`, and a list of column names.
-`kind` is `CLASS` or `VCLASS` in the first contract.
-Preserve optional top-level `users` and `database`, defaulting to an empty list and empty string.
-Preserve optional relation fields `system` and `indexes`, defaulting to false and an empty list.
-Validate their types and retain them when converting the integrated terminal schema.
-Names preserve their spelling.
-Unknown fields are ignored, but invalid required fields reject the snapshot.
-Snapshots contain metadata only, never credentials or executable commands.
+편집기 v1은 `schemaVersion: 1`, `user`, `relations`의 선택적 JSON을 읽습니다.
+각 관계는 `owner`, `name`, `kind`, 컬럼명 목록을 포함합니다.
+첫 계약의 `kind`는 `CLASS`·`VCLASS`입니다.
+선택적 최상위 `users`·`database`를 보존하며 기본값은 빈 목록·빈 문자열입니다.
+관계의 `system`·`indexes`도 보존하며 기본값은 false·빈 목록입니다.
+타입을 검사하고 통합 터미널 스키마 변환 시 유지합니다. 이름 표기를 바꾸지 않습니다.
+알 수 없는 필드는 무시하지만 잘못된 필수 필드는 스냅샷 전체를 거부합니다.
+메타데이터만 포함하고 자격 증명·실행 명령은 포함하지 않습니다.
 
-No snapshot means keyword completion and no invented relation names.
-A failed refresh retains the last valid snapshot with an explicit stale message.
-Initial load failure yields no schema and a visible availability message.
-Reload on an explicit command or configuration change.
-File watching is optional and must not cause an implicit database connection.
-The existing terminal adapter continues its current live refresh behavior.
+스냅샷이 없으면 키워드만 완성하고 관계 이름을 지어내지 않습니다.
+갱신 실패 시 마지막 정상 스냅샷과 오래됨 메시지를 유지합니다.
+초기 로드 실패는 스키마 없음과 가용성 메시지를 표시합니다.
+명시적 명령·설정 변경 시 재로드합니다. 파일 감시는 선택이며 암묵적 DB 연결을 만들면 안 됩니다.
+기존 터미널 어댑터의 실시간 갱신 동작은 유지합니다.
 
-## CLI contract
+## CLI 계약
 
-Install the future commands `cubrid-lint` and `cubrid-language-server` with the Python package.
-The server command requires the optional `lsp` dependencies.
-If they are absent, it prints installation guidance to stderr and exits with a tool failure.
+향후 `cubrid-lint`, `cubrid-language-server` 명령을 Python 패키지로 설치합니다.
+서버는 선택적 `lsp` 의존성이 필요하며 없으면 stderr에 설치 안내를 출력하고 도구 실패로 종료합니다.
 
-`cubrid-lint [--profile ID] [--script-mode sql|csql] [--format human|json] PATH...` checks explicit paths.
-Support `--config PATH`, `--parser-worker PATH`, and `--runtime-prefix PATH` as explicit configuration overrides.
-`-` reads stdin exactly once and can appear only once.
-Do not recursively scan directories or expand globs inside the tool.
-Default script mode is `csql` for `.csql` paths and `sql` for other paths or stdin.
-An explicit mode overrides that default.
-An EOF without a final semicolon is accepted if the selected native parser accepts it.
-Source text is never submitted to CSQL.
+`cubrid-lint [--profile ID] [--script-mode sql|csql] [--format human|json] PATH...`는 명시 경로를 검사합니다.
+`--config PATH`, `--parser-worker PATH`, `--runtime-prefix PATH` 덮어쓰기를 지원합니다.
+`-`는 stdin을 정확히 한 번 읽으며 한 번만 나타날 수 있습니다.
+도구 내부에서 재귀 디렉터리 검색·glob 확장을 하지 않습니다.
+`.csql`은 `csql`, 다른 경로·stdin은 `sql` 모드가 기본입니다. 명시적 모드가 우선합니다.
+마지막 세미콜론 없는 EOF는 선택 파서가 허용하면 허용합니다. 본문을 CSQL에 제출하지 않습니다.
 
-Human output uses `path:line:column: severity code message` and a per-file status.
-JSON stdout contains one object with `schemaVersion: 1`, `offsetEncoding: unicode-codepoints`, ordered document results, and the aggregate status.
-Each document includes its path, selected profile, coverage, diagnostics, and status.
-Each diagnostic's `span` contains numeric code-point `start` and `end` offsets.
-Runtime logs go to stderr or private logs, never structured stdout.
-An input failure still produces a document result in JSON mode.
+사람용 출력은 `path:line:column: severity code message`와 파일별 상태입니다.
+JSON stdout은 `schemaVersion: 1`, `offsetEncoding: unicode-codepoints`, 정렬된 문서 결과·통합 상태를 가진 객체 하나입니다.
+각 문서는 경로·선택 프로파일·범위·진단·상태를 포함합니다.
+진단의 `span`에는 숫자 코드 포인트 `start`·`end`가 있습니다.
+런타임 로그는 stderr·전용 로그로 보내며 구조화된 stdout에 넣지 않습니다.
+입력 실패도 JSON 문서 결과를 반환합니다.
 
-| Exit | Meaning |
+| 종료 코드 | 의미 |
 | --- | --- |
-| 0 | Every input is fully checked and valid |
-| 1 | Syntax errors exist and no tool error occurred |
-| 2 | Unsupported coverage exists, with no syntax or tool error |
-| 3 | Tool/input/configuration error, including invalid CLI arguments |
+| 0 | 모든 입력이 완전히 검사되고 정상 |
+| 1 | 문법 오류가 있으며 도구 오류는 없음 |
+| 2 | 미지원 범위가 있으며 문법·도구 오류는 없음 |
+| 3 | 잘못된 CLI 인자를 포함한 도구·입력·설정 오류 |
 
-For mixed files, use priority 3, then 1, then 2, then 0.
-Do not use an argument parser's default exit 2 for malformed arguments.
-No `--ignore-unsupported` option exists in v1.
+여러 파일은 3, 1, 2, 0 순으로 우선합니다.
+잘못된 인자에 argument parser 기본 종료 2를 사용하지 않습니다.
+v1에는 `--ignore-unsupported`가 없습니다.
 
-## Configuration and trust
+## 설정과 신뢰
 
-Use optional project JSON `.cubrid-language.json` for profile, script mode, and schema snapshot path.
-Initial default profile is `cubrid-11.5.0.2704-cc94778` after qualification.
-Resolve relative snapshot paths against the configuration directory.
-CLI precedence is explicit flags, explicit configuration, nearest ancestor configuration, then documented defaults.
-For stdin, use the process working directory as the discovery origin.
-Reject invalid configuration with `CUBRID-T1003`.
-Editor language-server settings override project values per document.
+선택적 프로젝트 JSON `.cubrid-language.json`에 프로파일·스크립트 모드·스키마 경로를 둡니다.
+검증 후 초기 기본 프로파일은 `cubrid-11.5.0.2704-cc94778`입니다.
+상대 스냅샷 경로는 설정 디렉터리 기준입니다.
+CLI 우선순위는 명시 플래그, 명시 설정, 가장 가까운 상위 설정, 문서 기본값 순입니다.
+stdin은 현재 작업 디렉터리에서 탐색합니다. 잘못된 설정은 `CUBRID-T1003`으로 거부합니다.
+편집기 서버 설정은 문서별로 프로젝트 값보다 우선합니다.
 
-Worker executable and runtime prefix come only from trusted user/editor settings or explicit CLI flags.
-Project configuration cannot contain executable commands or credentials.
-Use argv arrays and never invoke a shell to start the worker or server.
-Do not install or download runtimes automatically.
+워커 실행 파일·runtime prefix는 신뢰한 사용자·편집기 설정 또는 명시 CLI 플래그에서만 받습니다.
+프로젝트 설정에 실행 명령·자격 증명을 넣을 수 없습니다.
+argv 배열로 워커·서버를 시작하고 셸을 호출하지 않습니다. 런타임을 자동 설치·다운로드하지 않습니다.
 
-## LSP contract
+## LSP 계약
 
-Use LSP 3.17 over stdio.
-Use pygls for framing, JSON-RPC lifecycle, and protocol types.
-Advertise only implemented features.
-Initial document synchronization is full-text (`TextDocumentSyncKind.Full`).
-Support initialize/initialized, didOpen/didChange/didClose, completion, shutdown/exit, and cancellation.
-Add didChangeConfiguration with editor settings and the snapshot reload command.
+stdio의 LSP 3.17을 사용합니다. framing·JSON-RPC 수명·프로토콜 타입에는 pygls를 사용합니다.
+구현한 기능만 공표합니다. 초기 동기화는 전체 본문(`TextDocumentSyncKind.Full`)입니다.
+initialize/initialized, didOpen/didChange/didClose, completion, shutdown/exit와 취소를 지원합니다.
+편집기 설정용 didChangeConfiguration과 스냅샷 재로드 명령을 추가합니다.
 
-Completion returns explicit `textEdit` ranges converted from core spans.
-Diagnostics preserve core codes, severity, and document-version identity.
-Debounce syntax checks by 250 ms initially.
-Schedule native parsing outside the protocol event loop.
-Discard results for superseded document versions.
-Publish an empty list on close and cancel owned pending work.
-Cancelled requests use the protocol's cancellation error.
-Protocol stdout contains messages only.
-Native stderr and server logs remain separate.
+완성은 코어 범위를 변환한 명시적 `textEdit`를 반환합니다.
+진단은 코어 코드·심각도·문서 버전을 보존합니다. 초기 문법 검사는 250ms debounce를 사용합니다.
+네이티브 파싱은 프로토콜 이벤트 루프 밖에서 수행하고 이전 문서 버전 결과는 버립니다.
+닫을 때 빈 진단 목록을 게시하고 소유한 대기를 취소합니다.
+취소 요청에는 프로토콜 취소 오류를 사용합니다.
+프로토콜 stdout은 메시지만 포함하며 네이티브 stderr·서버 로그와 분리합니다.
 
-Missing runtime produces an availability/tool diagnostic while completion continues.
-Untitled documents explicitly opened as `cubrid` can use keyword/snapshot completion.
-They use SQL script mode unless the client supplies an explicit mode.
-Do not activate the server for generic SQL language IDs.
-Choose default script mode from the document URI using the CLI's filename rules.
+런타임 부재 시 완성을 유지하며 가용성·도구 진단을 제공합니다.
+명시적으로 `cubrid`로 연 무제 문서는 키워드·스냅샷 완성을 사용할 수 있습니다.
+클라이언트가 모드를 지정하지 않으면 SQL 모드입니다.
+일반 SQL 언어 ID에서 서버를 활성화하지 않습니다.
+문서 URI에는 CLI 파일명 규칙으로 기본 모드를 정합니다.
 
-These are project requirements based on the [LSP specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
-The project does not claim support for every LSP feature.
+이 요구사항은 [LSP 명세](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)에 기반합니다.
+프로젝트가 모든 LSP 기능을 지원한다는 뜻은 아닙니다.

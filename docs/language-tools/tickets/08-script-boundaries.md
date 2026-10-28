@@ -1,41 +1,44 @@
-# 08: Check mixed CSQL boundaries without session effects
+# 08: 세션 효과 없이 혼합 CSQL 경계 검사
 
-**What to build:** `.csql` scripts receive useful SQL diagnostics alongside a small checked session-command subset and explicit coverage gaps.
+**한국어** | [English](08-script-boundaries.en.md)
 
-**Blocked by:** 04.
+**구현 결과:** `.csql`에서 SQL 진단, 제한된 세션 명령 검사와 명시적인 지원 범위 부족을 함께 제공합니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 04.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [corpus](../corpus.json), [execution](../execution.md), and ticket 04's report.
-Read CSQL's source/manual command recognition rules without invoking user scripts.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commits.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [코퍼스](../corpus.json),
+[실행 규칙](../execution.md), 티켓 04 보고서를 읽습니다.
+사용자 스크립트 실행 없이 CSQL 소스·매뉴얼의 명령 인식 규칙을 확인합니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own `validation/scripts.py`, script fixtures/tests, and script-mode documentation.
-Recognize session lines only at eligible CSQL line boundaries outside strings, quoted identifiers, and comments.
-Preserve a source map when sending SQL portions to the native parser.
-Qualify exact `;help`, `;exit`, and `;autocommit on/off` lines.
-Other session commands, includes, shell commands, delimiter changes, and PL/CSQL bodies remain unsupported.
-Do not implement session effects or include-file loading.
+## 범위와 소유 파일
 
-## Acceptance criteria
+`validation/scripts.py`, 스크립트 예제·테스트·모드 문서를 소유합니다.
+문자열·인용 식별자·주석 밖의 적합한 CSQL 줄 경계에서만 세션 줄을 인식합니다.
+SQL 부분을 파서에 보낼 때 원문 맵을 유지합니다.
+정확한 `;help`, `;exit`, `;autocommit on/off` 줄만 검증합니다.
+다른 세션 명령·include·셸 명령·구분자 변경·PL/CSQL 본문은 미지원입니다.
+세션 효과나 include 파일 로드를 구현하지 않습니다.
 
-- [ ] Mixed valid command lines and supported SQL pass in CSQL mode with complete coverage.
-- [ ] Supported commands with invalid arguments produce a stable syntax diagnostic.
-- [ ] Strings/comments containing apparent commands or semicolons never create new session actions or false script boundaries.
-- [ ] Same-line SQL statements, final EOF, CRLF, and leading whitespace retain original offsets.
-- [ ] `;read` and shell-command fixtures produce unsupported diagnostics without opening targets or starting processes.
-- [ ] PL/CSQL routines remain one unsupported region, even when their bodies contain semicolons. Do not lint their fragments as ordinary SQL.
-- [ ] Mixed invalid SQL and unsupported regions preserve both diagnostics and use documented status/exit priority.
-- [ ] Malformed or ambiguous script boundaries never become a complete valid result.
-- [ ] SQL mode and CSQL mode differ explicitly. The server applies the per-document configured mode.
-- [ ] Add `just test-script-boundaries` with CLI/LSP parity and no-effects checks.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] 정상 명령 줄과 지원 SQL 혼합은 CSQL 모드에서 완전한 범위로 통과합니다.
+- [ ] 지원 명령의 잘못된 인자는 안정된 문법 진단을 반환합니다.
+- [ ] 문자열·주석 안의 명령처럼 보이는 내용이나 세미콜론이 세션 효과·잘못된 경계를 만들지 않습니다.
+- [ ] 같은 줄의 SQL, 마지막 EOF, CRLF, 선행 공백에서도 원래 오프셋을 유지합니다.
+- [ ] `;read`·셸 명령 예제는 대상 파일을 열거나 프로세스를 시작하지 않고 미지원 진단을 냅니다.
+- [ ] PL/CSQL은 내부 세미콜론과 관계없이 미지원 영역 하나로 유지합니다. 조각을 일반 SQL로 검사하지 않습니다.
+- [ ] 오류 SQL과 미지원 영역이 함께 있으면 두 진단을 보존하고 계약의 상태·종료 우선순위를 적용합니다.
+- [ ] 잘못되거나 모호한 경계를 완전히 정상인 결과로 처리하지 않습니다.
+- [ ] SQL·CSQL 모드를 명시적으로 구분하고 서버가 문서별 설정 모드를 적용합니다.
+- [ ] CLI·LSP 동등성과 효과 없음을 확인하는 `just test-script-boundaries`를 추가합니다.
 
-Commit scoped files and record mapping checks, command evidence, limitations, and commit in `reports/08.md`.
-This unlocks tickets 09 and 10 after ticket 05 also completes.
+## 근거와 인계
+
+범위만 커밋하고 위치 맵 검사·명령 근거·한계·커밋을 `reports/08.md`에 기록합니다.
+티켓 05도 완료되면 09·10을 시작할 수 있습니다.

@@ -1,104 +1,94 @@
-# Tab completion progress
+# Tab 자동 완성 진행 기록
 
-Work item: **560**. Branch: `tab-completion`. Merge destination: `main`.
+**한국어** | [English](completion-plan.en.md)
 
-The approved plan keeps the current editor and adds schema completion through
-the installed `csql`. No new Python runtime dependency is required.
+작업 기록: **560**. 브랜치: `tab-completion`. 병합 대상: `main`.
+이 문서는 최초 구현 당시의 이력입니다. 현재 기능은 [로드맵](roadmap.md)과 [사용 가이드](usage.md)를 확인하세요.
 
-## Checklist
+승인된 계획은 기존 편집기를 유지하고 설치된 `csql`로 스키마 완성을 추가합니다.
+새 Python 런타임 의존성은 필요하지 않습니다.
 
-- [x] **1. Completion menu.** Add Tab, Ctrl+N/P, Enter, and Esc handling.
-  Enter accepts a candidate without submitting SQL. Other modes retain their keys.
-- [x] **2. SQL context.** Detect table positions in unfinished SQL. Replace the
-  identifier at the cursor. Respect comments, strings, owners, and quoted names.
-- [x] **3. Catalog provider.** Fetch accessible tables and columns through a
-  bounded background `csql` process in client/server mode. Parse plain output.
-- [x] **4. Standalone snapshot.** Fetch metadata before the standalone client
-  starts. Close the metadata client before starting the interactive client.
-  Do not capture password keystrokes or query a second client during standalone use.
-- [x] **5. Cache and columns.** Cache metadata per session. Refresh client/server
-  metadata on expiry or request. Resolve simple aliases and column positions.
-- [x] **6. Acceptance.** Verify navigation, replacement, terminal resizing,
-  metadata failures, credentials, history boundaries, and real CUBRID behavior.
-  Update the README and review the final diff.
-- [x] **Integration preparation.** Continued with user approval. Rebased onto
-  current `main` and preserved the newer help/editor and history-age features.
-  Work item 560 records the final merge, push, cleanup, and verification result.
+## 체크리스트
 
-## Behavior
+- [x] **1. 완성 메뉴.** Tab, Ctrl+N/P, Enter, Esc 처리를 추가합니다.
+  Enter는 SQL 제출 없이 후보를 삽입합니다. 다른 모드의 키는 유지합니다.
+- [x] **2. SQL 문맥.** 미완성 SQL의 테이블 위치를 감지하고 커서의 식별자를 대체합니다.
+  주석·문자열·소유자·인용된 이름을 고려합니다.
+- [x] **3. 카탈로그 공급자.** 클라이언트/서버 모드에서 제한된 백그라운드 `csql`로
+  접근 가능한 테이블·컬럼을 읽고 일반 출력을 해석합니다.
+- [x] **4. 독립 모드 스냅샷.** 대화형 독립 클라이언트 전에 메타데이터를 읽고 조회 클라이언트를 종료합니다.
+  비밀번호 키 입력을 수집하거나 독립 실행 중 두 번째 클라이언트를 열지 않습니다.
+- [x] **5. 캐시와 컬럼.** 세션별 캐시, 클라이언트/서버의 만료·명시 갱신,
+  단순 별칭과 컬럼 위치 해석을 구현합니다.
+- [x] **6. 인수 검증.** 이동·대체·크기 변경·조회 실패·자격 증명·히스토리 경계와 실제 CUBRID 동작을 확인합니다.
+  README를 갱신하고 최종 diff를 검토합니다.
+- [x] **통합 준비.** 사용자 승인으로 진행했습니다. 최신 `main`에 rebase하면서
+  새 도움말·편집기와 히스토리 경과 시간 기능을 보존했습니다.
+  최종 병합·push·정리·검증 결과는 작업 기록 560에 있습니다.
 
-Tab opens a list of prefix matches. Ctrl+N/P and Down/Up select a candidate.
-Enter accepts the candidate. Esc restores the draft. Enter submits SQL only
-after the menu closes. Ctrl+N/P browse history when the menu is closed.
+## 동작
 
-Table and view names come from `db_class`. Column names come from `db_attribute`.
-The provider uses the selected database and user. Catalog queries stay outside
-the interactive client's SQL buffer and wrapper history.
+Tab은 접두어가 일치하는 후보를 엽니다. Ctrl+N/P와 아래·위로 선택하고 Enter로 삽입합니다.
+Esc는 초안을 복원합니다. 메뉴를 닫은 뒤 Enter로 SQL을 제출합니다.
+메뉴가 닫혀 있을 때 Ctrl+N/P는 히스토리를 탐색합니다.
 
-Client/server refresh sees committed metadata through a separate connection.
-Standalone completion uses an initial snapshot, which can become stale.
-Metadata failure leaves SQL editing and execution available.
+테이블·뷰는 `db_class`, 컬럼은 `db_attribute`에서 읽습니다.
+선택한 DB·사용자를 사용하며, 카탈로그 쿼리는 대화형 버퍼와 히스토리에 넣지 않습니다.
+클라이언트/서버 갱신은 별도 연결의 커밋된 메타데이터를 봅니다.
+독립 모드는 시작 스냅샷이라 오래될 수 있습니다. 조회 실패 후에도 SQL 편집·실행은 가능합니다.
 
-## Progress log
+## 진행 이력
 
-| Step | Commit | Result |
+| 단계 | 커밋 | 결과 |
 | --- | --- | --- |
-| Plan | `2e247c9` | Created this checklist and work item 560 from `main` at `0e95b34`. |
-| 1 | `9737b1b` | Added the menu, navigation, acceptance, cancellation, and terminal tests. |
-| 2 | `0810c07` | Added SQL context, quotes, owners, scopes, and full identifier replacement. |
-| 3 | `bf79f13` | Added background catalog loading, limits, cleanup, and connection routing. |
-| 4 | `b3ee15e` | Added the sequential standalone snapshot and authentication fallback. |
-| 5 | `fcec592` | Added cache verification, alias columns, refresh failure, and recovery. |
-| 6 | `7dc9b79` | Added real CUBRID acceptance, reserved-word quoting, and documentation. |
+| 계획 | `2e247c9` | `main`의 `0e95b34`에서 체크리스트와 작업 기록 560 생성 |
+| 1 | `9737b1b` | 메뉴·이동·선택·취소·터미널 테스트 추가 |
+| 2 | `0810c07` | 문맥·인용·소유자·범위·식별자 전체 대체 추가 |
+| 3 | `bf79f13` | 백그라운드 조회·제한·정리·접속 라우팅 추가 |
+| 4 | `b3ee15e` | 순차 독립 스냅샷과 인증 실패 대체 처리 추가 |
+| 5 | `fcec592` | 캐시 검증·별칭 컬럼·갱신 실패·복구 추가 |
+| 6 | `7dc9b79` | 실제 CUBRID 검증·예약어 인용·문서 추가 |
 
-Final review added expression-parenthesis handling and preserved indentation on
-later draft lines. It also separated reserved-word quoting from keyword suggestions.
-The final acceptance commit contains those changes and the tests for them.
+최종 검토에서 표현식 괄호 처리와 후속 초안 줄의 들여쓰기 보존을 추가했습니다.
+예약어 인용과 키워드 후보도 분리했습니다. 최종 검증 커밋에 이 변경과 테스트가 포함됩니다.
 
-Separate help/editor and history-age work advanced `main` to `428ec9f` during
-implementation. The user authorized continuation after acceptance. The rebase
-preserves both features. Completion now has its own F1 help. External draft
-editing remains available while the completion menu is open.
+구현 중 별도 도움말·편집기와 경과 시간 작업이 `main`을 `428ec9f`로 갱신했습니다.
+검증 후 사용자가 계속 진행하도록 승인했고 rebase는 두 기능을 보존했습니다.
+완성 전용 F1 도움말과 메뉴가 열린 동안의 외부 편집도 유지합니다.
 
-## Verification log
+## 검증 이력
 
-| Check | Result |
+| 검사 | 결과 |
 | --- | --- |
-| `just test` | Passed 82 tests before rebase, 101 after rebase, and all 102 after integration adaptation. |
-| `uv run python tests/verify_completion_csql.py` | Passed against CUBRID 11.5.0. |
-| `uv run python tests/verify_real_csql.py` | Passed the native bypass comparison matrix. |
-| `uv build` | Built wheel and source distribution. |
-| Wheel contents | Confirmed the launcher, completion, and metadata modules. |
+| `just test` | rebase 전 82개, 이후 101개, 통합 대응 후 102개 모두 통과 |
+| `uv run python tests/verify_completion_csql.py` | CUBRID 11.5.0에서 통과 |
+| `uv run python tests/verify_real_csql.py` | 네이티브 직접 전달 비교 행렬 통과 |
+| `uv build` | wheel·소스 배포 파일 생성 |
+| wheel 내용 | 실행기·완성·메타데이터 모듈 확인 |
 
-Real acceptance covers standalone and client/server table and column completion.
-It checks non-executing acceptance, exact history entries, restricted-user catalog
-visibility, and refresh after committed DDL. Each run uses temporary databases.
+실제 검증은 임시 DB에서 독립·클라이언트/서버의 테이블·컬럼 완성,
+실행 없는 후보 선택, 정확한 히스토리, 제한 사용자 가시성과 커밋된 DDL 이후 갱신을 확인했습니다.
+집중 검사는 잘못된 카탈로그 출력, 이스케이프, 자격 증명, 인용·소유자·별칭·범위,
+접미부 대체, 취소·결과 없음을 다룹니다.
+터미널 검사는 여러 줄, 크기 변경, 검색, 시간 제한, 프로세스 정리,
+갱신 실패·복구와 비활성 완성을 다룹니다.
 
-Focused checks cover malformed catalog output, escaping, credential routing,
-quotes, owners, aliases, scopes, replacement suffixes, cancellation, and no matches.
-Terminal checks cover multiline drafts, resizing, search, timeout, process cleanup,
-failed refreshes, recovery, and disabled completion.
+초기 실행에서 이전 리터럴 Tab 기대값, 잘린 상태 표시, 테스트 동기화 문제가 드러났고 수정 후 통과했습니다.
+나중 전체 실행에서 기존 합성 PID 파일 경쟁이 드러났습니다.
+테스트는 이제 atomic rename으로 PID 파일을 게시하며, 해당 종료 집중 검사도 통과했습니다.
 
-Earlier runs exposed an obsolete literal-Tab expectation, clipped status text,
-and test synchronization problems. Those checks passed after correction.
-A later full run exposed an existing synthetic PID-file race. The fixture now
-publishes its PID file with an atomic rename. Its focused termination test passed.
+## 당시 최초 버전의 제약
 
-## Limits
+- 독립 모드 메타데이터는 시작 스냅샷입니다. 갱신에는 재시작이 필요합니다.
+- 조회는 시작 자격 증명만 사용하고 프롬프트 비밀번호를 재사용하지 못합니다. 실패 시 키워드 완성을 유지합니다.
+- 클라이언트/서버는 별도 연결의 커밋된 스키마를 사용합니다. 대상·사용자를 바꾸면 재시작합니다.
+- CTE·파생 컬럼·상관 외부 별칭·동의어·시스템 테이블·CSQL 버퍼에만 남은 SQL은 최초 버전 범위 밖이었습니다.
+  이후 시스템 카탈로그 지원은 [현재 사용 가이드](usage.md)에 설명합니다.
+- 예약어 인용은 CUBRID 11.5 스냅샷을 사용합니다.
 
-- Standalone metadata is a startup snapshot. Restart the wrapper to refresh it.
-- Metadata reads use explicit launch credentials. They cannot reuse a password
-  entered at the interactive prompt. Lookup failure leaves keyword completion.
-- Client/server metadata uses a separate connection and sees committed schema.
-  Restart after changing the interactive connection target or user.
-- CTEs, derived-table columns, correlated outer aliases, synonyms, system tables,
-  and fragments held only in csql's command buffer are outside this first version.
-- Reserved-word quoting uses a CUBRID 11.5 snapshot.
+## 재개 시 확인
 
-## Resume
-
-Read work item 560 before resuming. Implementation and integration approval are
-complete. If the tracker remains open, inspect the branch and worktree status.
-Finish the approved fast-forward merge, `main` push, and task cleanup after checks.
-Preserve newer destination changes if `main` advances. Record final evidence in
-the tracker. If the tracker is done, do not repeat integration.
+재개 전에 작업 기록 560을 읽습니다. 구현과 통합 승인은 완료되었습니다.
+기록이 아직 열려 있으면 브랜치·작업 트리 상태를 확인하고 검사 후 승인된 fast-forward 병합,
+`main` push와 작업 정리를 마칩니다. `main`이 진행됐으면 새 변경을 보존합니다.
+최종 근거를 기록하고, 이미 완료된 기록이면 통합을 반복하지 않습니다.

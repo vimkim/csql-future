@@ -1,88 +1,85 @@
-# Planning verification record
+# 계획 문서 검증 기록
 
-Baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-Date: 2026-10-28.
-Only planning documents, starter fixtures, and a feasibility script changed.
-Production source and existing tests remain unchanged.
+**한국어** | [English](verification.en.md)
 
-| Check | Result | Limits |
+기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`. 날짜: 2026-10-28.
+당시 변경은 계획 문서·시작 예제·실험 스크립트뿐이었습니다.
+운영 코드와 기존 테스트는 바꾸지 않았습니다.
+
+| 검사 | 결과 | 한계 |
 | --- | --- | --- |
-| Native parse-only experiment | Seven fixed expectations passed, plus unfinished-input completion | Linux `11.5.0.2704-cc94778` only |
-| Traced final native run | No observed network calls or descendant executable; writable opens stayed in private temp paths | Network/execve/openat trace, not a full sandbox proof |
-| First `just test` | 117 tests, one PTY error | Preserve this failed attempt |
-| Focused failed-test rerun | One test passed | Does not explain the initial failure |
-| Second `just test` | 117 tests passed in 45.070 seconds | Existing terminal/unit suite, not future language-tool acceptance |
-| `just build` | Wheel and source distribution built successfully | Existing Python package only |
-| Markdown source validation | Passed for all packet documents | Source validation, not rendered layout |
-| Ticket graph/link check | Eleven nodes, no cycles, blocking text agrees, relative links exist | Dispatch still requires exact live baselines and external E01 resolution |
-| Starter corpus JSON | Eleven unique requirement fixtures parsed successfully | Intended requirements, not full 11.5 qualification results |
-| Diff whitespace check | Passed | No production implementation diff exists |
+| 네이티브 파싱 전용 실험 | 고정 기대값 7개와 미완성 완성 통과 | Linux `11.5.0.2704-cc94778`만 |
+| 최종 네이티브 추적 | network·자손 실행 파일 없음, 쓰기 열기는 전용 임시 경로 | network/execve/openat 추적이며 전체 sandbox 입증 아님 |
+| 첫 `just test` | 117개 중 PTY 오류 1개 | 실패 시도를 보존 |
+| 실패 테스트 집중 재실행 | 1개 통과 | 최초 실패 원인을 설명하지 못함 |
+| 두 번째 `just test` | 117개, 45.070초에 통과 | 기존 터미널·단위 테스트이며 미래 언어 도구 검증 아님 |
+| `just build` | wheel·소스 배포 파일 생성 | 기존 Python 패키지만 |
+| Markdown 소스 검증 | 모든 문서 통과 | 렌더링 배치 검증 아님 |
+| 티켓 그래프·링크 | 11노드, 순환 없음, 선행 문구 일치, 상대 경로 존재 | 할당 전 실제 기준·외부 E01 확인 필요 |
+| 시작 코퍼스 JSON | 고유 요구 예제 11개 해석 | 요구사항이며 전체 11.5 검증 결과 아님 |
+| diff 공백 검사 | 통과 | 운영 구현 diff 없음 |
 
-## Initial suite failure
+## 최초 테스트 실패
 
-The first `just test` ran 117 tests in 57.230 seconds.
-`test_default_retention_keeps_latest_ten_thousand_and_deduplicates_recall` failed at `tests/test_editable_session.py:1211`.
-It raised `IndexError` because the rendered screen lacked the expected `History search:` split marker.
-The test uses a fixed 0.05-second read before inspecting that overlay.
-This suggests timing sensitivity, but the cause was not established.
-No production or test repair was made under this planning scope.
+첫 `just test`는 117개를 57.230초 동안 실행했습니다.
+`tests/test_editable_session.py:1211`의
+`test_default_retention_keeps_latest_ten_thousand_and_deduplicates_recall`이 실패했습니다.
+렌더 화면에 예상 `History search:` 분할 표식이 없어 `IndexError`가 났습니다.
+테스트는 overlay 확인 전에 고정 0.05초를 기다립니다.
+시간 민감성을 시사하지만 원인은 확정하지 않았습니다.
+계획 범위에서 코드·테스트를 수정하지 않았습니다.
 
-The focused command passed one test in 0.643 seconds:
+집중 명령은 1개를 0.643초에 통과했습니다.
 
 ```bash
 uv run python -m unittest discover -s tests -p test_editable_session.py \
   -k test_default_retention_keeps_latest_ten_thousand_and_deduplicates_recall -v
 ```
 
-The subsequent complete suite passed all 117 tests.
-The local full rerun log is `/tmp/csql-language-plan-569-test-second.log`.
-That temporary path is supporting evidence, not a portable project dependency.
-Future agents must retain the initial failure in their baseline assessment.
+이후 전체 117개가 통과했습니다.
+전체 재실행 로그는 `/tmp/csql-language-plan-569-test-second.log`입니다.
+이 임시 경로는 보조 근거이며 이식 가능한 프로젝트 의존성이 아닙니다.
+후속 에이전트는 기준 평가에 최초 실패도 유지해야 합니다.
 
-## Document checks
+## 문서 검사
 
-The Markdown validator is the installed `markdown-write` skill's `scripts/check_markdown.py`.
-The graph/link check parsed all ticket records and checked referenced document paths.
-It also checked starter-corpus IDs and the retained native evidence.
+Markdown 검증기는 설치된 `markdown-write` 스킬의 `scripts/check_markdown.py`입니다.
+그래프·링크 검사는 모든 티켓 기록·참조 경로·코퍼스 ID·보존한 네이티브 근거를 확인했습니다.
 
-A Mermaid syntax-check attempt returned dependency exit 2 because Python Playwright was unavailable.
-No dependency installation was authorized or performed.
-The final spec uses the module table and prose instead of a Mermaid diagram.
-No Mermaid diagram remains in this packet, so no diagram-rendering claim is made.
+Mermaid 구문 검사는 Python Playwright 부재로 의존성 종료 2를 반환했습니다.
+의존성 설치는 승인받거나 수행하지 않았습니다.
+최종 명세는 Mermaid 대신 모듈 표·설명을 사용합니다.
+이 문서 묶음에는 Mermaid가 남아 있지 않으므로 렌더링 검증을 주장하지 않습니다.
 
-## Qualification still required
+## 남은 검증
 
-The qualified 11.5 native worker, production lint CLI, LSP, and editor packages remain unimplemented.
-Their acceptance commands are requirements listed in the tickets.
-This planning suite cannot satisfy those future release gates.
+11.5 운영 워커·린트 CLI·LSP·편집기 패키지는 계획 시점에 미구현입니다.
+티켓의 검증 명령은 구현 요구사항입니다. 계획 테스트로 미래 배포 조건을 충족하지 않습니다.
 
-The user selected 11.5 first during review.
-All implementation targets now use the observed build's exact profile.
-A research review also required conservative feature predicates before native parsing.
-The revised contracts and ticket 02 include that requirement.
+검토 중 사용자가 11.5 우선을 선택해 모든 구현 대상이 관찰 빌드의 정확한 프로파일을 사용합니다.
+조사 검토는 네이티브 파싱 전 보수적인 구문 조건도 요구했습니다.
+개정 계약과 티켓 02에 반영했습니다.
 
-## Main advanced after the planning baseline checks
+## 계획 기준 검사 후 main 진행
 
-Another session integrated completion work 568 as `99d49e13698b609ff4885a418578f7f50485e82f` during this session.
-The primary checkout is clean and its completion task worktree was removed by its owner.
-Work item 568 reports a passing 130-test suite and real-CUBRID acceptance for that integration.
-Those are the other session's results, not fresh checks performed by this planning session.
-The 117-test results above belong to the planning branch's original `c292d00` baseline.
-The approved rebase must include the newer completion behavior and run proportionate combined checks.
-The contracts and snapshot ticket now preserve its added schema metadata.
+다른 세션이 작업 568을 `99d49e13698b609ff4885a418578f7f50485e82f`로 통합했습니다.
+기본 체크아웃은 깨끗하고 완성 작업 트리는 소유자가 제거했습니다.
+작업 568은 해당 통합의 130개 테스트·실제 CUBRID 검증 통과를 보고합니다.
+이는 다른 세션의 결과이며 계획 세션이 새로 실행한 검사가 아닙니다.
+앞의 117개 결과는 원래 계획 기준 `c292d00`에 해당합니다.
+승인된 rebase에는 새 완성 동작과 적절한 통합 검사가 필요합니다.
+계약·스냅샷 티켓은 추가된 메타데이터를 보존하도록 갱신했습니다.
 
-## Approved rebase verification
+## 승인된 rebase 검증
 
-The user approved the planning packet's integration and main push.
-The two planning commits rebased onto `99d49e1` without conflicts.
-Fresh combined checks passed all 130 tests in 45.692 seconds.
-The log is `/tmp/csql-language-plan-569-integration-tests.log`.
+사용자가 계획 문서 통합과 main push를 승인했습니다.
+계획 커밋 두 개를 `99d49e1`에 충돌 없이 rebase했습니다.
+새 통합 검사는 130개를 45.692초에 통과했습니다.
+로그는 `/tmp/csql-language-plan-569-integration-tests.log`입니다.
 
-The native experiment also passed all seven fixed expectations with the integrated completion module.
-Unfinished-input completion still returned `id` and `name`.
-The observed native library hash matches the original experiment.
-The new run is `/tmp/csql-language-plan-569-integration-native.json`.
+통합 완성 모듈로 네이티브 실험의 고정 기대값 7개도 통과했습니다.
+미완성 완성은 여전히 `id`, `name`을 반환했고 라이브러리 해시도 원래 실험과 같았습니다.
+새 기록은 `/tmp/csql-language-plan-569-integration-native.json`입니다.
 
-The eleven-ticket graph, blocking text, starter corpus, relative links, Markdown source, and instruction structural checks passed.
-The diff against the integration destination contains only `docs/language-tools` files.
-No production source or existing test changed in this planning packet.
+11티켓 그래프·선행 문구·코퍼스·상대 링크·Markdown·지침 구조 검사가 통과했습니다.
+통합 대상 대비 diff는 `docs/language-tools`뿐이며 운영 코드·기존 테스트는 바꾸지 않았습니다.

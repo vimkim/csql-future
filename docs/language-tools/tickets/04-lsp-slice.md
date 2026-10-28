@@ -1,41 +1,43 @@
-# 04: Prove completion and syntax diagnostics through LSP
+# 04: LSP를 통한 완성과 문법 진단의 첫 통합 경로
 
-**What to build:** A protocol client receives shared completion and a CUBRID-specific serial diagnostic from one language server.
+**한국어** | [English](04-lsp-slice.en.md)
 
-**Blocked by:** 01, 03.
+**구현 결과:** 프로토콜 클라이언트가 언어 서버 하나에서 공통 완성과 CUBRID serial 진단을 받습니다.
 
-**Status:** specified. Wait for verified blocker integration.
+**선행 조건:** 01, 03.
 
-## Fresh-agent context
+**상태:** 명세 작성 완료. 선행 결과의 검증·통합을 기다립니다.
 
-Read [spec](../spec.md), [contracts](../contracts.md), [execution](../execution.md), and blocker reports.
-Read upstream pygls and LSP primary documentation before selecting tested dependency versions.
-Planning baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
-The coordinator supplies the exact dispatch baseline and blocker commits.
+## 새 에이전트에 전달할 문맥
 
-## Scope and ownership
+[명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md), 선행 보고서를 읽습니다.
+검증할 의존성 버전을 고르기 전에 pygls·LSP의 공식 문서를 읽습니다.
+계획 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
+조정자는 실제 할당 기준과 선행 커밋을 제공합니다.
 
-Own `src/csql_future/lsp/`, protocol tests, and server usage documentation.
-Add the `cubrid-language-server` entry point and optional `lsp` dependencies.
-Serialize `pyproject.toml`, lockfile, and `justfile` changes with the coordinator.
-Consume existing completion and validator interfaces.
-Do not create editor-specific completion, broaden grammar coverage, or package editor clients yet.
+## 범위와 소유 파일
 
-## Acceptance criteria
+`src/csql_future/lsp/`, 프로토콜 테스트와 서버 사용 문서를 소유합니다.
+`cubrid-language-server` 진입점과 선택적 `lsp` 의존성을 추가합니다.
+`pyproject.toml`·잠금 파일·`justfile` 수정은 조정자와 직렬화합니다.
+기존 완성·검증 인터페이스를 사용합니다.
+편집기별 완성·문법 범위 확대·클라이언트 패키징은 아직 추가하지 않습니다.
 
-- [ ] Complete initialize/open/full-change/completion/close/shutdown/exit protocol exchanges succeed over stdio.
-- [ ] A valid serial produces no syntax error. Malformed serial produces the same core code/span through CLI and LSP.
-- [ ] Unfinished relation/alias text still offers completion using a supplied test schema while native parsing rejects or lacks coverage.
-- [ ] Completion text edits replace full token spans and preserve SQL after the cursor.
-- [ ] Korean/emoji/CRLF locations agree after UTF-16 conversion. Advertised sync/encoding capabilities match implementation.
-- [ ] Slow native parsing does not block completion. Cancellation, superseding changes, and close suppress stale diagnostics.
-- [ ] Wrong-version, missing, timed-out, and crashed workers produce availability diagnostics without breaking keyword completion.
-- [ ] Logs remain outside protocol stdout and server invocation never uses a shell.
-- [ ] Add `just test-lsp` with a real subprocess protocol client. Add a vertical-slice check covering worker, core, CLI, and LSP.
-- [ ] The optional dependency installation leaves the base wrapper's zero-dependency installation intact.
+## 완료 조건
 
-## Evidence and handoff
+- [ ] stdio로 initialize/open/full-change/completion/close/shutdown/exit 전체 교환이 성공합니다.
+- [ ] 정상 serial에는 문법 오류가 없고, 잘못된 serial의 코어 코드·범위가 CLI와 LSP에서 같습니다.
+- [ ] 파서가 거부하거나 미지원이어도 테스트 스키마로 미완성 관계·별칭을 완성합니다.
+- [ ] 완성 편집은 토큰 전체 범위를 대체하고 커서 뒤 SQL을 유지합니다.
+- [ ] 한글·이모지·CRLF 위치가 UTF-16 변환 후 일치하며 공표한 동기화·인코딩 기능이 구현과 같습니다.
+- [ ] 느린 파싱이 완성을 막지 않고 취소·후속 변경·닫기 이후 오래된 진단을 내보내지 않습니다.
+- [ ] 잘못된 버전·부재·시간 초과·충돌 워커는 가용성 진단을 내고 키워드 완성을 유지합니다.
+- [ ] 로그를 프로토콜 stdout과 분리하고 서버 시작에 셸을 사용하지 않습니다.
+- [ ] 실제 하위 프로세스 클라이언트의 `just test-lsp`와 워커·코어·CLI·LSP 통합 검사를 추가합니다.
+- [ ] 선택 의존성 설치 후에도 기본 래퍼는 필수 의존성 없이 설치됩니다.
 
-Commit scoped files and record the complete vertical-slice transcript, checks, dependencies, and commit in `reports/04.md`.
-This is the gate before broader coverage or client packaging.
-It unlocks tickets 05, 06, 07, and 08.
+## 근거와 인계
+
+범위만 커밋하고 전체 통합 경로 기록·검사·의존성·커밋을 `reports/04.md`에 기록합니다.
+이 결과가 범위 확대·클라이언트 패키징 전 통과 조건입니다.
+티켓 05·06·07·08의 선행 조건입니다.

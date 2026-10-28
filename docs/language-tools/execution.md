@@ -1,127 +1,113 @@
-# Execution rules for the implementation packet
+# 구현 문서의 실행 규칙
 
-These rules preserve the user-provided AGENTS instructions from the planning session.
-Read them before dispatching any ticket.
-Read `/home/vimkim/my-cubrid/CUBRID.md` before CUBRID-specific work.
-Its personal policies override conflicting repository guidance.
+**한국어** | [English](execution.en.md)
 
-## Scope and source of truth
+이 규칙은 계획 세션에서 사용자가 제공한 AGENTS 지침을 보존합니다.
+티켓 할당 전에 읽습니다. CUBRID 작업 전 `/home/vimkim/my-cubrid/CUBRID.md`를 읽으며,
+개인 정책이 충돌하는 저장소 지침보다 우선합니다.
 
-The [spec](spec.md) and [contracts](contracts.md) define required behavior.
-The [ticket files](tickets/README.md) define the selected implementation graph.
-The [machine-readable graph](tickets/graph.json) repeats ticket IDs, files, and blocking edges for validation.
-If they disagree, stop dispatch and reconcile them before implementation.
-Local files are the issue tracker for this packet.
-Do not create or update GitHub/JIRA issues without separate authorization.
+## 범위와 기준 자료
 
-The [starter corpus](corpus.json) contains requirements, not release qualification results.
-The [probe evidence](evidence/native-probe.json) contains observed results on one 11.5 build.
-Keep those evidence categories separate.
-Do not copy historical completion-plan checkmarks into new acceptance reports.
+[명세](spec.md)·[계약](contracts.md)이 필수 동작을 정의합니다.
+[티켓](tickets/README.md)이 선택한 구현 그래프를 정의합니다.
+[기계용 그래프](tickets/graph.json)는 검증용 ID·파일·선행 관계를 반복합니다.
+불일치하면 할당을 중지하고 구현 전에 조정합니다.
+로컬 파일이 이 문서 묶음의 이슈 추적기입니다. 별도 권한 없이 GitHub·JIRA 이슈를 생성·수정하지 않습니다.
 
-## Checkout and integration
+[시작 코퍼스](corpus.json)는 요구사항이며 배포 검증 결과가 아닙니다.
+[실험 근거](evidence/native-probe.json)는 11.5 빌드 하나의 관찰입니다.
+두 근거 종류를 구분합니다. 과거 완성 계획의 체크 표시를 새 완료 보고서로 복사하지 않습니다.
 
-1. Inspect branches, worktrees, remotes, and dirty files.
-2. Preserve unrelated work and other sessions' worktrees.
-3. From `main`, `develop`, or `feature/*`, create a sibling task worktree and topic branch.
-4. Record the starting branch as the merge destination.
-5. Use the current checkout for another named task branch unless its agreed integration destination requires isolation.
-6. Commit scoped changes after focused checks and diff review.
-7. Stage only task files.
-8. Ask once before rebasing onto the current local destination and merging.
+## 체크아웃과 통합
 
-After approval, check a clean destination on the expected branch.
-Rebase onto its current tip.
-Resolve conflicts, inspect the diff, and run proportionate checks.
-Merge with `git merge --ff-only <rebased-task-commit>`.
-Repeat under the same approval if the destination advances.
-Use a squash merge only when rebase and fast-forward are impractical.
-Abort any active rebase before the squash fallback.
+1. 브랜치·작업 트리·remote·변경 파일을 확인합니다.
+2. 무관한 작업·다른 세션 작업 트리를 보존합니다.
+3. `main`, `develop`, `feature/*`에서는 형제 작업 트리와 topic 브랜치를 만듭니다.
+4. 시작 브랜치를 병합 대상으로 기록합니다.
+5. 다른 이름의 작업 브랜치는 합의한 통합 대상이 격리를 요구하지 않으면 현재 체크아웃을 사용합니다.
+6. 집중 검사·diff 검토 후 범위에 맞는 변경을 커밋합니다.
+7. 작업 파일만 stage합니다.
+8. 현재 로컬 대상에 rebase·병합하기 전에 한 번 승인을 요청합니다.
 
-The user's merge approval authorizes pushing `main` through its configured remote.
-Other branch pushes need separate explicit authorization.
-Extension/package publication and deployment also need separate authorization.
-Before task cleanup, check that the destination retains its changes.
-Remove only this task's linked worktree and local branch, without force.
-Run worktree removal from outside that worktree.
-Preserve valuable ignored/uncommitted files and report cleanup obstacles.
-Never remove remote branches without explicit authorization.
+승인 후 대상이 예상 브랜치이며 깨끗한지 확인합니다.
+현재 tip에 rebase하고 충돌 해결·diff 검토·적절한 검사를 수행합니다.
+`git merge --ff-only <rebased-task-commit>`으로 병합합니다.
+대상이 진행되면 같은 승인으로 반복합니다.
+rebase·fast-forward가 비현실적일 때만 squash를 사용하며 진행 중 rebase는 먼저 중단합니다.
 
-The future implementation coordinator must obtain approval before integrating ticket branches into its integration destination.
-It can request one approval for the concrete committed ticket results available for review.
-Do not infer integration approval from this planning packet or an upstream skill's automatic-merge step.
+병합 승인은 설정된 remote로 `main`을 push하는 권한을 포함합니다.
+다른 브랜치 push, 확장·패키지 게시, 배포에는 별도 권한이 필요합니다.
+정리 전에 대상이 변경을 보존하는지 확인합니다.
+해당 작업의 연결 작업 트리·로컬 브랜치만 강제 옵션 없이 제거합니다.
+작업 트리 밖에서 제거하고 가치 있는 ignored·미커밋 파일을 보존하며 장애를 보고합니다.
+명시 권한 없이 원격 브랜치를 제거하지 않습니다.
 
-## External completion dependency E01
+구현 조정자는 티켓 브랜치를 통합 대상에 합치기 전에 승인을 받아야 합니다.
+검토 가능한 구체적인 커밋 결과에 대해 한 번의 승인을 요청할 수 있습니다.
+계획 문서 승인이나 상위 스킬의 자동 병합 절차를 구현 승인으로 해석하지 않습니다.
 
-Work 568 completed during planning.
-Main includes its integration commit `99d49e13698b609ff4885a418578f7f50485e82f`.
-Its owner removed the completion worktree and branch after integration.
-Ticket 01 must check that its dispatch baseline includes that result or a verified successor.
-Preserve the expanded command contexts, vocabulary, catalog fields, and regression coverage.
-The planning packet was rebased onto `99d49e1` under the user's integration approval.
-Use independent ticket 02 if ticket 01's integration baseline remains unresolved.
-Record the checked baseline in the dispatch record.
+## 외부 완성 의존성 E01
 
-## Fresh-agent contract
+계획 중 작업 568이 완료되었습니다.
+main은 `99d49e13698b609ff4885a418578f7f50485e82f`를 포함합니다.
+소유자가 통합 후 완성 작업 트리·브랜치를 제거했습니다.
+티켓 01은 할당 기준에 해당 결과나 확인된 후속 결과가 있는지 검사합니다.
+확장된 문맥·어휘·카탈로그 필드·회귀 검사를 보존합니다.
+계획 문서는 사용자 승인으로 `99d49e1`에 rebase했습니다.
+티켓 01 기준이 불명확하면 독립적인 티켓 02를 사용합니다.
+검사한 기준을 할당 기록에 남깁니다.
 
-Use one new clean-context agent for each ticket.
-In this harness, set `fork_turns="none"`.
-Do not reuse an agent for a different ticket.
-Give every agent a separate task branch and worktree.
-Create them from the current verified integration tip.
+## 새 에이전트 계약
 
-Before dispatch, record the following exact values in a persistent assignment:
+티켓마다 깨끗한 문맥의 새 에이전트 하나를 사용합니다.
+이 환경에서는 `fork_turns="none"`으로 설정합니다.
+다른 티켓에 같은 에이전트를 재사용하지 않습니다.
+검증한 현재 통합 tip에서 티켓별 브랜치·작업 트리를 만듭니다.
 
-- Ticket ID and its file.
-- Specification, contracts, execution rules, and applicable research pointers.
-- Checkout, branch, and full baseline commit.
-- Verified blocker commits and external dependency state.
-- Permitted files and exclusive shared files.
-- Acceptance commands and required observable outcomes.
-- Existing authorization and remaining merge/publication gates.
+할당 전에 다음 값을 영구 기록합니다.
 
-The ticket's planning baseline is a context reference.
-It is not a command to reset a later integration branch.
-Never dispatch an assignment with an unresolved baseline commit.
+- 티켓 ID·파일.
+- 명세·계약·실행 규칙·관련 조사 자료.
+- 체크아웃·브랜치·전체 기준 커밋.
+- 확인한 선행 커밋·외부 의존성 상태.
+- 허용 파일·독점 공유 파일.
+- 검증 명령·필수 관찰 결과.
+- 기존 권한·남은 병합/게시 승인.
 
-An agent returns a scoped commit and an acceptance-to-evidence report.
-The coordinator checks the combined result before releasing dependents.
-An agent's completion message alone does not satisfy a blocker.
-Use TDD for new behavior at public interfaces.
-Do not add tests that merely repeat internal helper logic.
-Retain external-process and PTY regressions for terminal changes.
+계획 기준은 문맥용 참조이며 나중 통합 브랜치를 reset하라는 명령이 아닙니다.
+기준 커밋이 불명확한 할당은 실행하지 않습니다.
 
-Run independent ready tickets concurrently only after their shared interfaces are stable.
-Serialize changes to packaging, task recipes, coverage aggregation, or other shared files.
-The coordinator owns each integration and the durable state record.
-Every ticket names its file ownership.
-New ownership requires recording the reason and checking active assignments first.
+에이전트는 범위에 맞는 커밋과 완료 조건별 근거 보고서를 반환합니다.
+조정자는 합친 결과를 확인한 뒤 종속 티켓을 엽니다.
+완료 메시지만으로 선행 조건을 충족하지 않습니다.
+새 공개 인터페이스 동작에는 TDD를 사용하고 내부 helper를 반복하는 테스트는 추가하지 않습니다.
+터미널 변경에는 외부 프로세스·PTY 회귀 검사를 유지합니다.
 
-## Tracking and verification
+공유 인터페이스가 안정된 뒤에만 준비된 독립 티켓을 병렬 수행합니다.
+패키징·작업 명령·범위 집계 등 공유 파일은 직렬로 수정합니다.
+조정자가 통합·영구 상태 기록을 소유합니다.
+각 티켓은 파일 소유권을 명시하며 추가 소유권은 이유 기록·진행 할당 확인이 필요합니다.
 
-Planning work is item 569.
-Do not mark the full ecosystem implemented when only this planning packet is complete.
-The next implementation session should create a distinct substantive build item linked to 569.
-Check the existing record before creating a duplicate.
-Keep status, blockers, commits, and next actions in `work-tracker` notes and local ticket reports.
+## 추적과 검증
 
-Rediscover the current `justfile` before running project checks.
-At the planning baseline, `just test` runs Python unit and PTY tests.
-`just build` creates Python source/wheel distributions.
-New ticket acceptance recipes are requirements to add, not existing commands.
-Keep missing mandatory native/editor test prerequisites visible.
-A skipped native check cannot satisfy release qualification.
+계획 작업은 569입니다. 계획만 완료한 상태를 전체 생태계 구현 완료로 표시하지 않습니다.
+다음 구현 세션은 569와 연결한 별도 실질 작업을 만들며 중복 생성 전에 기존 기록을 확인합니다.
+상태·선행 조건·커밋·다음 동작을 `work-tracker`와 로컬 보고서에 유지합니다.
 
-Use the `cubrid-build` skill for any native source setup/build.
-Use the documented work environment workflow if an isolated database test is necessary.
-No ticket may execute submitted lint text as a reference check.
-Use reviewed fixed fixtures in an isolated database only for the existing catalog adapter.
-Do not start CUBRID daemons for parser-only checks.
+프로젝트 검사 전에 현재 `justfile`을 확인합니다.
+계획 기준의 `just test`는 Python 단위·PTY 테스트, `just build`는 소스·wheel 빌드입니다.
+새 티켓의 검증 명령은 추가할 요구사항이며 기존 명령이 아닙니다.
+필수 네이티브·편집기 조건 부재를 명시합니다. 건너뛴 네이티브 검사는 배포 검증을 충족하지 않습니다.
 
-This host uses slow X11 forwarding.
-Never start a visible GUI or auto-open a browser.
-Use headless editor automation, terminal output, paths, and viewing URLs.
+네이티브 소스 준비·빌드는 `cubrid-build`를 사용합니다.
+격리 DB 테스트가 필요하면 문서의 작업 환경 절차를 따릅니다.
+린트 입력을 기준 확인용으로 실행하지 않습니다.
+기존 카탈로그 어댑터만 검토한 고정 예제와 격리 DB를 사용합니다.
+파서 전용 검사에는 CUBRID daemon을 시작하지 않습니다.
 
-For ordinary next-step questions, review this session goal first.
-After completion, say “We’re done” and run `work-tracker list --here` from the project directory.
-Use an unscoped list only when the user asks what to do next today.
+이 호스트는 X11 전달이 느립니다. GUI·브라우저 자동 열기를 사용하지 않습니다.
+headless 편집기 자동화·터미널 출력·경로·보기 URL을 사용합니다.
+
+일반적인 다음 단계 질문에는 세션 목표부터 확인합니다.
+완료 후 “We’re done”이라고 알리고 프로젝트 디렉터리에서 `work-tracker list --here`를 실행합니다.
+오늘 할 일을 물었을 때만 전체 목록을 사용합니다.

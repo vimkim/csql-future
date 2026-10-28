@@ -1,15 +1,28 @@
-# Usage and implementation notes
+# 사용 및 구현 안내
 
-`csql-future` is a Linux-first wrapper around the installed, unmodified
-`csql` executable. Interactive terminal launches use a wrapper-owned multiline
-editor and styled Catppuccin-inspired prompt. Noninteractive launches still
-replace the wrapper process with csql so scripts retain csql's normal behavior.
+**한국어** | [English](usage.en.md) · [문서 목차](README.md)
 
-## Runtime and installation
+`csql-future`는 설치된 `csql` 실행 파일을 수정하지 않고 감싸는 Linux 우선 도구입니다.
+대화형 터미널에서는 여러 줄 편집기와 Catppuccin 계열 색상의 프롬프트를 제공합니다.
+비대화형 실행에서는 프로세스를 `csql`로 교체해 기존 스크립트 동작을 유지합니다.
 
-The launcher uses Python 3.10 or newer and only the standard library at runtime.
-It uses the `csql` executable on `PATH`, so selecting a CUBRID work environment
-also selects the underlying client. The wrapper installs independently of CUBRID.
+## 먼저 써 볼 기능
+
+1. 평소 접속 옵션으로 `csql-future -u dba mydb`를 실행합니다.
+2. 쿼리를 제출한 뒤 **Ctrl+R**로 테이블명·조건 등 기억나는 단어를 검색합니다.
+3. Enter로 결과를 편집기에 불러옵니다. 수정 후 다시 Enter를 눌러 제출합니다.
+4. `SHOW `, `;`, SQL 힌트 이름, 테이블·컬럼 위치에서 **Tab**으로 후보를 확인합니다.
+
+Ctrl+R은 공백으로 나눈 검색어를 모두 포함하는 쿼리를 찾습니다.
+순서와 대소문자는 구분하지 않으며, 여러 줄 전체를 검색합니다.
+퍼지 검색 스타일의 흐름이지만 오타 보정이나 검색어 내부의 문자 건너뛰기 매칭은 지원하지 않습니다.
+내부 공유용 설명은 [소개·시연](internal-introduction.md), 예정된 편집기 기능은 [로드맵](roadmap.md)에 있습니다.
+
+## 실행 환경과 설치
+
+Python 3.10 이상과 표준 라이브러리만 사용합니다.
+`PATH`의 `csql`을 실행하므로 선택한 CUBRID 작업 환경에 따라 실제 클라이언트도 바뀝니다.
+도구는 CUBRID와 별도로 설치합니다.
 
 ```bash
 just sync                         # uv tool install --reinstall .
@@ -17,387 +30,342 @@ csql-future --help
 csql-future -u dba mydb
 ```
 
-`uv tool install --reinstall .` installs an isolated tool environment and exposes
-`csql-future` in `uv tool dir --bin` (normally `~/.local/bin`). That directory
-must be on `PATH`. `just sync` can run from any working directory with
-`just --justfile /path/to/csql-future/justfile sync`.
-The installation remains usable after the source checkout moves or disappears.
-`--help` and `--version` work without a CUBRID installation. Other arguments
-pass through to csql; run `csql` directly for its native usage.
+`uv tool install --reinstall .`은 격리된 도구 환경을 설치하고,
+`uv tool dir --bin` 경로(일반적으로 `~/.local/bin`)에 명령을 노출합니다.
+이 경로를 `PATH`에 추가하세요. 다른 디렉터리에서는
+`just --justfile /path/to/csql-future/justfile sync`로 설치할 수 있습니다.
+설치 후 소스 체크아웃을 옮기거나 제거해도 명령을 사용할 수 있습니다.
+`--help`와 `--version`은 CUBRID 없이 동작합니다. 나머지 인자는 `csql`로 전달합니다.
+CSQL 자체 사용법은 `csql`을 직접 실행해 확인하세요.
 
-For development, run `uv sync`, `just test`, or
-`uv run csql-future -u dba mydb`. `just build` creates wheel and source
-archives in `dist/`.
+개발 시에는 `uv sync`, `just test`, `uv run csql-future -u dba mydb`를 사용합니다.
+`just build`는 `dist/`에 wheel과 소스 배포 파일을 만듭니다.
 
-### Nushell cs and daily updates
+### 개인 Nushell cs 연동과 일일 업데이트
 
-The personal `cs` alias in `~/my-cubrid/aliases.nu` calls `csql.sh`. The integration
-in `my-cubrid` launches this tool after selecting the database, choosing SA/CS
-mode, and checking the selected client's source tree against the running server.
-Load your CUBRID environment and use `cs [DATABASE] [CSQL OPTIONS]` as before.
-Direct `csql` remains available through the active CUBRID environment.
+이 절은 작성자의 개인 환경에 해당합니다. 일반 설치에는 필요하지 않습니다.
+`~/my-cubrid/aliases.nu`의 `cs` 별칭은 `csql.sh`를 호출합니다.
+이 스크립트는 데이터베이스와 SA/CS 모드를 선택하고 선택한 클라이언트 소스와
+실행 중 서버의 일치 여부를 확인한 다음 이 도구를 실행합니다.
+CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 사용합니다.
+활성 CUBRID 환경의 `csql`도 직접 실행할 수 있습니다.
 
-`daily-update-cubrid` registers `~/gh/csql-future` and runs `just sync`
-after its guarded fetch and fast-forward. It requires an independent clean
-checkout on `main` tracking `origin/main` from `vimkim/csql-future`.
-Use `daily-update-cubrid --dry-run ~/gh/csql-future` to preview an update.
+`daily-update-cubrid`는 `~/gh/csql-future`를 등록하고 안전 조건을 확인한 fetch·fast-forward 후
+`just sync`를 실행합니다. `vimkim/csql-future`의 `origin/main`을 추적하는,
+변경 사항 없는 독립 `main` 체크아웃이 필요합니다.
+`daily-update-cubrid --dry-run ~/gh/csql-future`로 동작을 미리 확인합니다.
 
-The accepted wrapper options are:
+### 옵션과 배치 실행
 
-- `--history-file PATH`, defaulting to `.csql_history.sqlite3` in the launch
-  directory. A relative path is resolved from that directory once.
-- `--history-limit N`, defaulting to 10,000; `N` must be an integer.
-- `--no-history`, which disables saving while retaining read-only recall from an
-  existing selected history file.
-- `--no-completion`, which disables schema lookups and keeps literal Tab input.
+| 옵션 | 동작 |
+| --- | --- |
+| `--history-file PATH` | 기본값은 실행 디렉터리의 `.csql_history.sqlite3`. 상대 경로는 시작 시 한 번 해석 |
+| `--history-limit N` | 기본 10,000개. `N`은 정수 |
+| `--no-history` | 저장하지 않고 기존 선택 파일에서 읽기 전용으로 불러오기 |
+| `--no-completion` | 스키마 조회를 끄고 Tab을 문자 그대로 입력 |
 
-Pipe input and csql's `-i`/`--input-file` and `-c`/`--command` forms go straight
-to csql without creating or changing wrapper history. Process replacement
-preserves csql's standard streams, redirections, signals, and exit status. The
-parser recognizes csql options that take values so SQL, passwords, filenames,
-and other values resembling wrapper options remain csql values. Use `--` to
-stop all wrapper-option processing.
+파이프 입력과 CSQL의 `-i`/`--input-file`, `-c`/`--command`는 히스토리를 생성·변경하지 않고
+`csql`로 직접 전달합니다. 프로세스 교체로 표준 스트림, 리다이렉션, 시그널, 종료 상태를 유지합니다.
+값을 받는 CSQL 옵션을 인식하므로 SQL·비밀번호·파일명 등이 래퍼 옵션처럼 보여도 값으로 처리합니다.
+`--` 뒤에서는 래퍼 옵션 해석을 중지합니다.
 
-## Interactive input
+## 대화형 입력
 
-Input starts immediately after `csql-future> ` on the same line. The
-editor updates changed rows without clearing the display on each keypress;
-cursor movement leaves unchanged text and the status bar in place. Ctrl+L
-refreshes the editor. Layout follows the live terminal dimensions, including
-after a resize, even when exported `COLUMNS` or `LINES` values are stale.
+입력은 `csql-future> ` 바로 뒤 같은 줄에서 시작합니다.
+키를 누를 때마다 화면 전체를 지우지 않고 바뀐 행만 갱신합니다.
+커서를 움직여도 바뀌지 않은 본문과 상태 표시줄은 유지합니다. Ctrl+L로 편집기를 다시 그립니다.
+크기 변경 후에도 실제 터미널 크기를 따르며, 오래된 `COLUMNS`·`LINES` 값에 의존하지 않습니다.
 
-The editor starts in **Input mode**. Ctrl+R switches to **History search mode**;
-recalling a result or canceling the search returns to Input mode. The status bar
-names the active mode.
-The status bar highlights **Ctrl+R history** and **Ctrl+Q quit** in Input mode.
-History search shows **Ctrl+Q quit**, **Enter recall**, and **Esc back** as space
-allows. Essential keys wrap onto additional status rows in narrow terminals;
-secondary hints are omitted when space is tight.
+처음에는 **입력 모드(Input)**입니다. Ctrl+R로 **히스토리 검색 모드(History search)**로 전환합니다.
+결과를 불러오거나 취소하면 입력 모드로 돌아갑니다. 상태 표시줄에 현재 모드를 표시합니다.
+입력 모드에서는 **Ctrl+R history**, **Ctrl+Q quit**을 강조합니다.
+검색 중에는 공간이 허용하는 범위에서 **Ctrl+Q quit**, **Enter recall**, **Esc back**을 표시합니다.
+좁은 터미널에서는 필수 키를 여러 상태 행으로 나누고 보조 안내를 생략합니다.
 
-In either mode, `?` in an empty input field opens that mode's shortcut panel.
-**F1** opens it at any time, including while editing a nonempty draft or search
-query. Help opens a bounded inline preview with grouped actions, highlighted
-keys, and a fixed title and footer. **Ctrl+R: Search query history (enters
-history search mode)** appears at the top of Input mode help. The position
-indicator shows the visible rows and total. Up/Down or Ctrl+P/N scrolls the
-contents, Page Up/Down moves a page, and Home/End jumps to the beginning/end.
-`?`, F1, Esc, or Enter closes it. Closing help preserves the draft, search query,
-selection, and cursor.
-Question marks in nonempty fields remain ordinary text.
-The preview uses the normal terminal screen; no alternate screen is needed.
-Opening it can push earlier output into scrollback when space is limited, while
-scrolling within it keeps the preview frame and draft in place.
+빈 입력란에서 `?`를 누르면 해당 모드의 단축키 도움말을 엽니다.
+**F1**은 초안이나 검색어가 있어도 도움말을 엽니다.
+도움말은 동작별 그룹, 강조된 키, 고정 제목·바닥글을 가진 인라인 패널입니다.
+입력 도움말 맨 위에는 **Ctrl+R: Search query history (enters history search mode)**를 표시합니다.
+위치 표시에는 현재 보이는 행과 전체 행 수가 나옵니다.
+위·아래 또는 Ctrl+P/N으로 스크롤하고, Page Up/Down으로 페이지를 이동합니다.
+Home/End는 처음·끝으로 이동합니다. `?`, F1, Esc, Enter로 닫습니다.
+닫아도 초안, 검색어, 선택, 커서를 유지합니다. 비어 있지 않은 입력란의 `?`는 일반 문자입니다.
+대체 화면 없이 일반 터미널 화면을 사용합니다.
+공간이 부족하면 도움말을 열 때 기존 출력이 스크롤백으로 이동할 수 있지만,
+도움말 내부 스크롤은 프레임과 초안을 유지합니다.
 
-In Input mode:
+### 입력 모드
 
-- Tab opens completion. Ctrl+N/P, Down/Up, or repeated Tab selects a candidate.
-  Typing, deleting, or moving the cursor refreshes the list for the current draft.
-  The selected candidate stays selected while it still matches. An empty list
-  stays open, so deleting a typo brings matches back.
-  Enter accepts it without executing SQL. Esc closes the list without changing
-  the draft. Enter submits SQL after the completion list closes.
-  Tab in indentation, strings, and comments inserts a literal tab.
-  F1 shows completion-specific help while the list is open. Ctrl+X Ctrl+E
-  closes completion and opens the current draft in the external editor.
-- Enter submits the entire draft.
-- **Ctrl+X Ctrl+E** opens the current draft in an external terminal editor.
-  Press Ctrl+X, then Ctrl+E. The wrapper uses `$VISUAL`, then `$EDITOR`, then
-  `vi`; for Neovim, set `EDITOR=nvim` (or `VISUAL=nvim` if `VISUAL` is already
-  set). Editor commands can contain arguments and quoted paths. The temporary
-  file has a `.sql` extension and includes the full multiline draft. Saving
-  and exiting restores its text for further editing; Enter is still required
-  to submit it. An unsuccessful editor exit or unreadable result keeps the
-  original draft. An unchanged file also preserves the cursor. The final file
-  newline is removed as an editor terminator; additional newlines are retained.
-  Editor keystrokes and unsent edits do not enter wrapper history. The file is
-  removed when the editor returns.
-- Ctrl+Enter inserts a newline without submitting; Ctrl+J also works. The
-  editor accepts a terminal mapping to LF,
-  [CSI-u](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) (`ESC [ 13 ; 5 u`),
-  or [xterm modifyOtherKeys](https://invisible-island.net/xterm/modified-keys.html)
-  (`ESC [ 27 ; 5 ; 13 ~`). A terminal that sends the same bytes
-  for Ctrl+Enter and Enter needs its own key mapping; Ctrl+J works without one.
-  Alt+Enter remains accepted for compatibility but is no longer advertised.
-- Left/Right move within the draft. Up/Down move between logical draft lines;
-  at the first or last line they browse older/newer history. Moving newer than
-  the latest entry restores the unfinished draft.
-- Ctrl+P/N browse older/newer history directly, including from a multiline
-  draft, and restore the unfinished text and cursor when returning to it.
-- Ctrl+A/E (or Home/End) move to the logical line's start/end. Ctrl+B/F move
-  left/right by one character. Backspace or Ctrl+H deletes the character to the
-  left; Delete or Ctrl+D deletes the character at the cursor.
-- Ctrl+W cuts the previous whitespace-delimited word, Ctrl+U cuts to the line's
-  start, and Ctrl+K cuts to its end (or joins the next line at a line ending).
-  Ctrl+Y restores the last cut. Ctrl+T swaps adjacent characters. These editing
-  bindings also work in the history search field.
-- Ctrl+R opens history search below the current draft.
-- Ctrl+C clears the draft. Ctrl+D exits when the draft is empty.
+- Tab으로 자동 완성을 엽니다. Ctrl+N/P, 아래·위, 반복 Tab으로 후보를 선택합니다.
+  Enter는 후보를 삽입하며 SQL을 실행하지 않습니다. Esc는 초안을 바꾸지 않고 닫습니다.
+  목록이 닫힌 뒤 Enter로 SQL을 제출합니다. 들여쓰기·문자열·일반 주석에서는 리터럴 Tab을 넣습니다.
+  SQL 힌트 주석의 이름 위치에서는 힌트 후보를 제안합니다.
+  목록이 열린 동안 F1은 완성 도움말을 표시합니다.
+  Ctrl+X Ctrl+E는 완성을 닫고 원래 초안을 외부 편집기로 엽니다.
+- Enter는 초안 전체를 제출합니다.
+- **Ctrl+X Ctrl+E**는 현재 초안을 외부 터미널 편집기로 엽니다. Ctrl+X 다음 Ctrl+E를 누릅니다.
+  `$VISUAL`, `$EDITOR`, `vi` 순으로 선택합니다. Neovim은 `EDITOR=nvim`으로 지정하며,
+  `VISUAL`이 이미 설정되어 있으면 `VISUAL=nvim`을 사용합니다.
+  편집기 명령에는 인자와 따옴표로 감싼 경로를 사용할 수 있습니다.
+  임시 `.sql` 파일에 여러 줄 초안 전체를 넣습니다. 저장하고 종료하면 수정한 본문을 복원합니다.
+  제출하려면 Enter가 필요합니다. 편집기 실패나 읽기 실패 시 원래 초안을 유지합니다.
+  파일이 바뀌지 않으면 커서도 유지합니다. 마지막 줄바꿈 하나는 편집기의 종결 문자로 제거하고
+  추가 줄바꿈은 유지합니다. 편집기 키 입력과 미제출 수정은 히스토리에 저장하지 않습니다.
+  편집기가 반환하면 임시 파일을 제거합니다.
+- Ctrl+Enter는 제출 없이 줄바꿈을 넣습니다. Ctrl+J도 가능합니다.
+  LF 매핑, [CSI-u](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)의 `ESC [ 13 ; 5 u`,
+  [xterm modifyOtherKeys](https://invisible-island.net/xterm/modified-keys.html)의
+  `ESC [ 27 ; 5 ; 13 ~`를 인식합니다.
+  Ctrl+Enter와 Enter가 같은 바이트를 보내는 터미널은 별도 매핑이 필요합니다.
+  Ctrl+J는 별도 매핑 없이 동작합니다. Alt+Enter는 호환성을 위해 계속 인식합니다.
+- 왼쪽·오른쪽은 초안 안에서 이동합니다. 위·아래는 논리적 줄 사이를 이동하며,
+  첫 줄·마지막 줄에서는 이전·다음 히스토리를 탐색합니다. 최신 항목 다음으로 이동하면 미완성 초안을 복원합니다.
+- Ctrl+P/N은 여러 줄 초안에서도 이전·다음 히스토리를 직접 탐색합니다.
+  미완성 초안으로 돌아오면 본문과 커서를 복원합니다.
+- Ctrl+A/E 또는 Home/End는 논리적 줄의 처음·끝으로 이동합니다.
+  Ctrl+B/F는 한 글자씩 이동합니다. Backspace·Ctrl+H는 왼쪽 글자,
+  Delete·Ctrl+D는 커서의 글자를 지웁니다.
+- Ctrl+W는 공백으로 구분된 이전 단어, Ctrl+U는 줄 처음까지,
+  Ctrl+K는 줄 끝까지 잘라냅니다. 줄 끝의 Ctrl+K는 다음 줄을 합칩니다.
+  Ctrl+Y는 마지막 잘라내기를 복원합니다. Ctrl+T는 인접 글자를 바꿉니다.
+  이 편집 키는 검색 입력란에서도 동작합니다.
+- Ctrl+R은 현재 초안 아래에 히스토리 검색을 엽니다.
+- Ctrl+C는 초안을 지웁니다. 빈 초안의 Ctrl+D는 종료합니다.
 
-In History search mode:
+### 히스토리 검색 모드
 
-- Type to filter history. Search is case-insensitive and every space-separated
-  term must occur somewhere in the complete command, including across embedded
-  newlines.
-- Ctrl+N/P or Down/Up selects a result.
-- Enter recalls the selected result in Input mode for editing without execution,
-  with the cursor at the end of the recalled text.
-- Esc restores the draft and cursor from before the search.
-- Ctrl+C closes search and clears the unfinished draft.
-- The text-editing keys listed above also edit the search query.
+- 입력할 때마다 결과를 좁힙니다. 대소문자를 구분하지 않으며 공백으로 나눈 모든 검색어가
+  줄바꿈을 포함한 전체 명령 어딘가에 있어야 합니다.
+- Ctrl+N/P 또는 아래·위로 결과를 선택합니다.
+- Enter는 선택한 결과를 입력 모드로 불러옵니다. 실행하지 않으며 커서를 본문 끝에 둡니다.
+- Esc는 검색 전 초안과 커서를 복원합니다.
+- Ctrl+C는 검색을 닫고 미완성 초안을 지웁니다.
+- 위에 설명한 본문 편집 키로 검색어도 편집할 수 있습니다.
 
-Ctrl+Q exits from either mode or its shortcut panel, discarding the unfinished
-draft without executing or saving it. While csql or a terminal program owns
-input, keys continue to pass through to that program.
+Ctrl+Q는 두 모드와 도움말에서 종료하며, 미완성 초안을 실행·저장하지 않고 버립니다.
+CSQL이나 터미널 프로그램이 입력을 소유할 때는 키를 해당 프로그램으로 전달합니다.
 
-Each draft line is handed to csql unchanged as one physical csql input line.
-csql therefore remains responsible for SQL parsing, session commands, automatic
-execution, its command buffer, and explicit `;xrun`. A draft containing embedded
-newlines is one wrapper submission, while drafts submitted separately remain
-separate even when csql accumulates them internally.
+각 초안 줄은 원래 내용 그대로 CSQL의 물리적 입력 한 줄로 전달합니다.
+SQL 파싱, 세션 명령, 자동 실행, 내부 명령 버퍼, 명시적 `;xrun`은 CSQL이 담당합니다.
+줄바꿈이 있는 초안 하나는 래퍼 제출 한 건입니다.
+별도로 제출한 초안은 CSQL 내부에서 누적되더라도 서로 다른 제출로 남습니다.
 
-## Persistent history
+## 영구 히스토리
 
-Interactive submissions are appended to the selected SQLite file before they
-are handed to csql. SQL that later fails and csql session commands are therefore
-available after restart, and a multiline draft remains one entry with its
-newlines intact. The wrapper stores separate submissions rather than attempting
-to reconstruct csql's command buffer.
+대화형 제출은 CSQL에 전달하기 전에 선택한 SQLite 파일에 기록합니다.
+나중에 실패한 SQL과 세션 명령도 재시작 후 불러올 수 있습니다.
+여러 줄 초안은 줄바꿈을 유지한 항목 하나입니다.
+CSQL 내부 명령 버퍼를 재구성하지 않고 각 제출을 저장합니다.
 
-History retains one entry per exact complete command text, in latest-use order.
-Submitting the same text again replaces its older entry and updates its
-timestamp. Differences in whitespace and capitalization remain separate entries.
-Opening a writable history file removes existing duplicates, keeping each
-command's latest occurrence and its timestamp. Up/Down recall only changes the
-editable draft; Enter is still required to submit it. A submission whose first
-character is a space is not retained. `--no-history` neither appends nor removes
-entries, but can browse an existing selected file.
+완전한 명령 본문이 정확히 같은 항목은 최신 사용 순서로 하나만 보관합니다.
+같은 본문을 다시 제출하면 이전 항목을 대체하고 시각을 갱신합니다.
+공백·대소문자가 다르면 별도 항목입니다.
+쓰기 가능한 파일을 열 때 기존 중복을 제거하고 최신 항목과 시각을 유지합니다.
+위·아래로 불러와도 편집 가능한 초안만 바뀌며, 제출에는 Enter가 필요합니다.
+첫 글자가 공백인 제출은 저장하지 않습니다.
+`--no-history`는 추가·삭제 없이 기존 파일을 탐색합니다.
 
-Ctrl+R search uses the same deduplicated latest-use view. The picker is part of
-the prompt rather than a full-screen interface: it keeps the unfinished draft
-visible, marks one selected result, limits its result window to the available
-terminal height, and reports an explicit no-match state. Long results are
-truncated for display only; recalling them preserves their complete text.
-Each result has a right-aligned age such as `(3 min ago)` or `(2 days ago)`.
-This is the most recent **submission** time for that exact query, including
-submissions that failed. It is saved with history and survives restarts;
-memory-only history also tracks ages for the current session. Timestamps are
-recorded from this version onward. Older entries show `(time unknown)` until
-submitted again. Writable stores are upgraded automatically; `--no-history`
-can read older stores without modifying them. Narrow terminals shorten
-`(just now)` to `(now)` and `(time unknown)` to `(unknown)`.
+Ctrl+R도 중복을 제거한 최신 사용 순서를 사용합니다.
+검색 목록은 전체 화면 대신 프롬프트 안에 표시하며 미완성 초안을 보존합니다.
+선택 항목을 표시하고 터미널 높이에 맞게 결과 수를 제한합니다.
+일치 결과가 없으면 그 상태를 명시합니다. 긴 결과는 표시만 줄이고, 불러올 때는 전체 본문을 유지합니다.
+오른쪽의 `(3 min ago)`, `(2 days ago)`는 해당 본문의 최근 **제출** 시각 이후 경과 시간입니다.
+실패한 제출도 포함합니다. 시각은 재시작 후에도 유지하며 메모리 전용 히스토리도 현재 세션의 시각을 추적합니다.
+시각 기록 기능 이전의 항목은 다시 제출하기 전까지 `(time unknown)`으로 표시합니다.
+쓰기 가능한 저장소는 자동으로 갱신합니다. `--no-history`는 이전 저장소를 수정하지 않고 읽습니다.
+좁은 터미널에서는 `(just now)`를 `(now)`, `(time unknown)`을 `(unknown)`으로 줄입니다.
 
-The selected file is the history scope, independent of the database name or
-connection target. The default hidden file isolates launch directories; an
-explicit path can share history between them. Already-running wrappers refresh
-committed shared entries when Up starts a new browse or Ctrl+R opens search.
+히스토리 범위는 선택한 파일로 결정하며 데이터베이스명·접속 대상과 독립적입니다.
+기본 숨김 파일은 실행 디렉터리별로 분리합니다. 경로를 지정하면 디렉터리 간 공유가 가능합니다.
+이미 실행 중인 래퍼도 위 키로 새 탐색을 시작하거나 Ctrl+R을 열 때 커밋된 공유 항목을 다시 읽습니다.
 
-Each saved submission replaces any exact duplicate, inserts the latest entry,
-and prunes history in one short SQLite transaction. The default keeps the latest
-10,000 unique commands; repeated submissions do not consume extra slots.
-`--history-limit` sets the committing wrapper's limit. Memory-only history uses
-the same deduplication and retention rules.
+각 저장은 중복 대체, 최신 항목 삽입, 보관 한도 초과 삭제를 짧은 SQLite 트랜잭션 하나로 처리합니다.
+기본값은 최근 고유 명령 10,000개이며 반복 제출은 슬롯을 추가로 차지하지 않습니다.
+`--history-limit`은 커밋하는 래퍼의 한도를 지정합니다. 메모리 전용 모드도 같은 중복·보관 규칙을 사용합니다.
 
-Writers use WAL journal mode and a 300 ms busy timeout. WAL allows live readers
-alongside a writer, while SQLite serializes writers; the `-wal` and `-shm`
-sidecar files belong with the history file while sessions are live. This policy
-is for same-host local filesystems. Network-filesystem sharing is neither
-supported nor implied by the same-host tests because WAL depends on shared
-memory between processes.
+쓰기는 WAL 저널 모드와 300ms busy timeout을 사용합니다.
+WAL은 읽기와 쓰기의 병행을 허용하며 SQLite가 쓰기를 직렬화합니다.
+세션이 실행 중일 때 `-wal`, `-shm` 보조 파일도 히스토리 파일과 함께 유지해야 합니다.
+이 정책은 같은 호스트의 로컬 파일시스템을 대상으로 합니다.
+WAL은 프로세스 간 공유 메모리에 의존하므로 네트워크 파일시스템 공유는 지원하지 않습니다.
 
-If live writers use different limits, every successful commit applies that
-writer's configured limit to the shared file. Commit order therefore determines
-the retained rows: a smaller-limit writer can prune rows permanently, while a
-later larger-limit writer can retain new rows up to its limit but cannot restore
-what was pruned. No persistent database-wide limit silently overrides either
-invocation.
+여러 쓰기 세션의 한도가 다르면 각 커밋은 그 세션의 한도를 적용합니다.
+작은 한도로 삭제된 항목은 나중에 큰 한도를 적용해도 복원되지 않습니다.
+파일 전체에 숨겨진 별도 한도를 두어 실행 옵션을 덮어쓰지 않습니다.
 
-If the selected history file cannot be opened, read, or written, the wrapper
-warns that persistent history is unavailable and that newly retained entries
-will disappear on exit. The enhanced editor stays active in an explicit
-`MEMORY-ONLY` mode: Up/Down recall and Ctrl+R search continue to use retained
-current-session submissions, including multiline text and the same deduplicated
-latest-use view. Leading-space and `--no-history` exclusions still apply.
+선택 파일을 열거나 읽거나 쓸 수 없으면 영구 히스토리를 사용할 수 없고
+이후 저장한 항목이 종료 시 사라진다는 경고를 표시합니다.
+편집기는 명시적인 `MEMORY-ONLY` 모드로 계속 동작합니다.
+위·아래와 Ctrl+R은 현재 세션에서 보관한 제출을 사용하며 여러 줄과 중복 제거 순서를 유지합니다.
+선행 공백과 `--no-history`의 저장 제외 규칙도 그대로 적용합니다.
 
-Memory-only mode lasts until the wrapper exits. The wrapper closes the failed
-SQLite connection and does not retry, reconnect after the destination becomes
-available, or backfill volatile submissions. Restarting opens the selected
-store afresh, so submissions committed before the failure remain available and
-post-failure submissions do not appear. A history failure does not switch to
-ordinary-csql fallback and does not prevent csql from executing the affected or
-later submissions.
+메모리 전용 모드는 종료까지 유지합니다. 실패한 SQLite 연결은 닫고 재시도·재연결·임시 제출 재저장을 하지 않습니다.
+재시작하면 파일을 새로 열므로 실패 전 커밋 항목은 남지만 실패 후 제출은 나타나지 않습니다.
+히스토리 실패로 일반 CSQL 대체 모드로 전환하지 않으며 해당 SQL과 이후 제출도 계속 실행합니다.
 
-The wrapper removes its editor display before handing the terminal back to csql,
-leaves csql result and error output in the transcript, and draws one current
-prompt/status display when csql is ready again.
+CSQL에 터미널을 돌려주기 전에 편집기 표시를 지웁니다.
+결과·오류 출력을 터미널 기록에 남기고, CSQL이 준비되면 현재 프롬프트와 상태 표시를 한 번 그립니다.
 
-### SQL-input boundary
+### SQL 입력 경계
 
-Interactive csql runs on a private pseudo-terminal. Readiness requires both:
+대화형 CSQL은 전용 가상 터미널(PTY)에서 실행합니다. 입력 준비에는 두 조건이 모두 필요합니다.
 
-1. the private csql prompt bytes, used only to remove csql's hidden transport
-   prompt; and
-2. the child pseudo-terminal's kernel line discipline being noncanonical with
-   echo disabled, the mode libedit enters while it is actually reading SQL.
+1. 숨겨진 전송용 CSQL 프롬프트를 제거하는 데 쓰는 전용 프롬프트 바이트가 있어야 합니다.
+2. 자식 PTY가 libedit의 실제 SQL 입력 상태인 비정규(noncanonical)·에코 비활성 모드여야 합니다.
 
-Neither a random prompt marker nor a period of silence is accepted by itself.
-Consequently, query output that happens to contain the private prompt text is
-relayed as output while csql is executing, and quiet work does not return input
-ownership early. The current slices validate this connected SQL-input path and
-capture only text returned by the wrapper editor as a submission. While csql has
-a child attached to its pseudo-terminal, input, output, and the child line
-discipline remain owned by that terminal program. This lets password input keep
-csql's no-echo behavior and lets pagers, editors, and shells use the terminal
-until they return. Linux `/proc` child information distinguishes a temporary
-terminal program from libedit's otherwise identical raw/no-echo SQL-input mode.
-The enhanced editor then resumes in the same csql session; this is not an
-ordinary-csql fallback.
+임의의 프롬프트 표식이나 잠깐의 무출력만으로는 준비 완료로 판단하지 않습니다.
+쿼리 결과에 전용 프롬프트 문자열이 있어도 실행 중 출력으로 전달하고,
+조용한 작업 때문에 입력 소유권을 일찍 가져오지 않습니다.
+현재 검증은 접속 후 SQL 입력 경로를 대상으로 하며 편집기가 반환한 본문만 제출로 저장합니다.
+CSQL의 자식이 PTY에 연결된 동안 입력·출력·라인 규칙은 그 프로그램이 소유합니다.
+비밀번호의 에코 비활성 동작과 pager·편집기·셸의 터미널 사용을 보존합니다.
+Linux `/proc`의 자식 정보로 임시 프로그램과 libedit의 동일한 raw/no-echo 모드를 구분합니다.
+돌아오면 같은 CSQL 세션에서 향상된 편집기를 재개합니다. 일반 CSQL 대체 실행이 아닙니다.
 
-Only text returned by the wrapper editor is a wrapper submission. Thus `;edit`
-may be retained, but text typed in csql's native external editor, pager keystrokes, shell
-commands, and password responses are neither reconstructed nor saved as separate
-history entries.
+편집기가 반환한 본문만 래퍼 제출입니다.
+`;edit`는 저장될 수 있지만 CSQL 자체 외부 편집기에서 입력한 본문, pager 키,
+셸 명령, 비밀번호 응답을 별도 히스토리로 재구성·저장하지 않습니다.
+Ctrl+X Ctrl+E는 CSQL 내부 버퍼 대신 래퍼 초안을 편집합니다.
+반환한 본문도 Enter를 누른 뒤에만 제출·히스토리가 됩니다.
 
-Ctrl+X Ctrl+E edits the wrapper's draft instead of csql's internal command buffer.
-Its returned text becomes a submission and history entry only after Enter.
+터미널 크기 변경은 CSQL 전용 터미널로 전달합니다.
+긴 초안과 멀티바이트 초안도 새 크기로 즉시 다시 그리고, pager·편집기·셸도 변경을 받습니다.
+해당 프로그램에서 돌아오면 출력·쿼리 결과를 스크롤백에 남긴 채 새 크기에 맞는 프롬프트와 상태줄을 그립니다.
 
-The wrapper propagates every live terminal resize to csql's private terminal.
-The enhanced editor redraws a long or multibyte draft immediately at the new
-dimensions, and pagers, editors, and shells observe resizes while they own the
-terminal. Returning from a terminal program redraws one prompt and status bar at
-the current size without removing the program or query output from scrollback.
+CSQL 실행 중 Ctrl+C는 편집기 명령 대신 CSQL 터미널에 전달합니다.
+직접·래퍼 비교 검증은 1,000행 물리 테이블의 3중 조인을 중단한 뒤 양쪽에서 다음 쿼리 성공을 확인했습니다.
+모든 쿼리 단계가 즉시 취소된다는 의미는 아닙니다.
+느린 6중 `db_class` 조인에서는 직접 CSQL과 래퍼 모두 실행 계획을 출력한 뒤
+Ctrl+C 후 5초 제한 안에 반환하지 않았습니다.
+관찰된 대기는 래퍼 추가 지연이 아닌 직접 CSQL의 실행 단계 제약으로 분류합니다.
+검증 도구는 두 시도를 제한 시간 내 종료하고 정리를 확인합니다.
 
-Ctrl+C typed while csql is running is relayed to csql's terminal rather than
-handled as an editor command. A direct-versus-wrapped acceptance case interrupts
-a three-way join of a 1,000-row physical table and successfully executes another
-query in both sessions. This does not imply that every csql query phase cancels
-immediately. The prototype's slow six-way `db_class` join is reproducible in the
-production harness: both direct and wrapped csql emit a query plan, then fail to
-return within a bounded five seconds after Ctrl+C. That places the observed wait
-in query execution and demonstrates a direct-csql limitation, not wrapper-added
-delay. The harness terminates both bounded probes and verifies cleanup instead
-of waiting indefinitely or claiming universal cancellation.
+SIGHUP·SIGTERM은 CSQL 프로세스 그룹에 전달합니다.
+외부 터미널 설정 전체를 복원하고 `128 + signal`로 종료합니다.
+정리는 정상 종료 대기 1초 후 프로세스 그룹을 종료하므로 입력을 무한정 기다리는 CSQL을 남기지 않습니다.
+일반 `;exit`, 빈 초안 Ctrl+D, CSQL 초기 오류와 시그널 종료의 관찰된 종료 상태 동작을 유지합니다.
 
-SIGHUP and SIGTERM are forwarded to the csql process group. The wrapper restores
-the complete outer terminal settings and exits with `128 + signal`; cleanup has
-a one-second graceful bound followed by a process-group kill so csql cannot be
-left waiting indefinitely for terminal input. Ordinary `;exit`, empty-draft
-Ctrl+D, early csql error exits, and signal exits preserve the observed csql exit
-status behavior.
+## 스키마 및 CUBRID 전용 자동 완성
 
-## Schema completion
+`select * from co`에서 Tab을 누르면 접근 가능한 `co` 접두어 테이블·뷰를 표시합니다.
+`FROM`, `JOIN`, `UPDATE`, `INSERT INTO`와 쉼표로 구분한 테이블 위치를 인식합니다.
+소유자로 한정하거나 따옴표로 감싼 식별자도 처리하며, 인용이 필요한 이름에는 대괄호를 붙입니다.
+SQL 키워드도 제안합니다. 예약어 인용에는 CUBRID 11.5 키워드 스냅샷을 사용합니다.
 
-For `select * from co`, Tab lists accessible tables and views whose names start
-with `co`. Table completion recognizes `FROM`, `JOIN`, `UPDATE`, `INSERT INTO`,
-and comma-separated tables. It respects owner-qualified and quoted identifiers.
-Names that require quoting receive brackets. SQL keywords are also available.
-Reserved-word quoting uses a CUBRID 11.5 keyword snapshot.
+### SHOW 문장과 진단 SQL
 
-`SHOW` completion covers the CUBRID 11.4 inspection and diagnostic families:
+`SHOW` 완성은 CUBRID 11.4 기준 조회·진단 계열을 다룹니다.
 `TABLES`, `COLUMNS`, `INDEX`/`INDEXES`/`KEYS`, `COLLATION`, `TIMEZONES`, `GRANTS`,
-`CREATE TABLE`/`CREATE VIEW`, `ACCESS STATUS`, `EXEC STATISTICS`, volume/log/archive
-headers, heap headers/capacity, slotted pages, index headers/capacity, critical
-sections, transaction tables, threads, job queues, and page-buffer status.
-`DESC`, `DESCRIBE`, and `EXPLAIN` complete table/view names. In CUBRID, these
-commands describe columns; use `;plan` for query plans.
+`CREATE TABLE`/`CREATE VIEW`, `ACCESS STATUS`, `EXEC STATISTICS`,
+volume/log/archive 헤더, heap 헤더·용량, slotted page, index 헤더·용량,
+critical section, transaction table, thread, job queue, page-buffer 상태를 포함합니다.
+`DESC`, `DESCRIBE`, `EXPLAIN`은 테이블·뷰를 완성합니다.
+CUBRID에서 이 명령은 컬럼을 설명합니다. 쿼리 실행 계획에는 `;plan`을 사용하세요.
 
-Completion guides each command's keywords, including `FULL`, `ALL`, `FROM`/`IN`,
-`OF`, and the volume/page structure of slotted-page commands. Object arguments
-use cached names: tables for heap inspection, views for `SHOW CREATE VIEW`, users
-for `SHOW GRANTS FOR`, and indexes after `SHOW INDEX HEADER OF table.` or
-`SHOW INDEX CAPACITY OF owner.table.`. Diagnostic keywords identify their DBA
-requirement. Syntax remains available when metadata cannot be loaded.
+각 명령의 `FULL`, `ALL`, `FROM`/`IN`, `OF`와 slotted-page의 volume/page 구조를 안내합니다.
+객체 인자는 캐시를 사용합니다. heap 조회는 테이블, `SHOW CREATE VIEW`는 뷰,
+`SHOW GRANTS FOR`는 사용자, `SHOW INDEX HEADER OF table.`·
+`SHOW INDEX CAPACITY OF owner.table.`는 인덱스를 제안합니다.
+진단 키워드에는 DBA 필요 여부를 표시합니다. 메타데이터가 없어도 문법 후보는 제공합니다.
 
-Where supported, `LIKE` and `WHERE` are offered after the command. `SHOW ... WHERE`
-completes the command's result fields rather than columns of the underlying table.
-For example, `SHOW COLUMNS FROM athlete WHERE fi` offers `Field`, and
-`SHOW THREADS WHERE st` offers `Status`. String contents remain literal, except
-for the parameter assignments described below.
+지원되는 위치에서는 명령 뒤에 `LIKE`·`WHERE`를 제안합니다.
+`SHOW ... WHERE`는 원래 테이블 컬럼 대신 해당 SHOW 결과 필드를 완성합니다.
+`SHOW COLUMNS FROM athlete WHERE fi`는 `Field`, `SHOW THREADS WHERE st`는 `Status`를 제안합니다.
+아래 파라미터 대입 예외를 제외하면 문자열 내용은 문자 그대로 입력합니다.
 
-Type `;` and Tab for native session command names and descriptions, plus the
-wrapper's `;refresh-completions`. Common arguments also complete: `;plan` offers
-`simple`, `detail`, and `off`; `;trace` offers `on`/`off` and `text`/`json`;
-`on`/`off` switches, `;schema` and `;info stats` table names, and `;connect` user
-names are supported. Native abbreviations remain usable.
+### 세션 명령과 단축 입력
 
-`GET`/`SET` optimization and isolation syntax, `SET TRACE`, `SHOW TRACE`, and
-`UPDATE STATISTICS ON` also complete, including comma-separated tables,
-`ALL CLASSES`, `CATALOG CLASSES`, and `WITH FULLSCAN`.
+`;` 뒤에서 Tab을 누르면 네이티브 세션 명령과 설명, 래퍼의 `;refresh-completions`를 표시합니다.
+주요 인자도 완성합니다. `;plan`은 `simple`·`detail`·`off`,
+`;trace`는 `on`·`off`와 `text`·`json`을 제안합니다.
+`on`·`off` 옵션, `;schema`·`;info stats`의 테이블, `;connect`의 사용자도 지원합니다.
+네이티브 약어를 계속 사용할 수 있으며, `;pl`에서 `;plan`처럼 명령 이름을 완성할 수 있습니다.
 
-Parameter completion supports `;get`, `;set`, and quoted assignments in
-`SET SYSTEM PARAMETERS '...'`. Setters offer documented dynamic parameters,
-append `=` when needed, and suggest Boolean values; SQL assignments also offer
-`DEFAULT` where supported. Names, types, DBA requirements, and SHOW result fields
-use a documented CUBRID 11.4 snapshot; the selected server may differ. Numeric
-values, file paths, arbitrary expressions, and most free-form command arguments
-are entered normally. Regenerate the vocabulary with
-`python3 tools/generate_completion_data.py /path/to/cubrid-manual --ref origin/release/11.4`.
+`GET`/`SET` optimization·isolation 문법, `SET TRACE`, `SHOW TRACE`,
+`UPDATE STATISTICS ON`도 완성합니다. 쉼표로 구분한 테이블, `ALL CLASSES`,
+`CATALOG CLASSES`, `WITH FULLSCAN`을 포함합니다.
 
-System catalog names and columns come from the selected database, including
-accessible `db_` and `_db_` objects. `FROM db_in` offers `db_index` and
-`db_index_key`; catalog aliases supply columns normally. System objects appear
-when their literal prefix is requested or an owner is supplied, keeping ordinary
-table lists focused on user objects. The current user's catalog visibility is
-preserved; underlying `_db_` classes may be available only to DBA.
+파라미터 완성은 `;get`, `;set`, `SET SYSTEM PARAMETERS '...'`의 인용된 대입을 지원합니다.
+설정 명령은 문서화된 동적 파라미터만 제안하고 필요하면 `=`를 붙입니다.
+불리언 값과 지원되는 SQL 대입의 `DEFAULT`도 제안합니다.
+이름·타입·DBA 조건·SHOW 결과 필드는 CUBRID 11.4 문서 스냅샷을 사용하므로 실제 서버와 다를 수 있습니다.
+숫자·파일 경로·임의 표현식·대부분의 자유 형식 인자는 직접 입력합니다.
+어휘는 다음 명령으로 재생성합니다.
 
-Column completion resolves simple table aliases. For example, `c.na` in
-`select * from code c where c.na` can complete to `c.name`. A table later in
-the same draft can supply columns for an unfinished `SELECT` list. With multiple
-tables, unqualified column suggestions include aliases to avoid ambiguity.
-CTE names, derived-table columns, synonyms, correlated outer aliases, and SQL
-fragments held only in csql's command buffer are outside this implementation.
+```bash
+python3 tools/generate_completion_data.py /path/to/cubrid-manual --ref origin/release/11.4
+```
 
-Completion uses the installed `csql`, with no Python driver or editor dependency.
-It reads `db_class`, `db_attribute`, `db_index`, and `db_user` as the launch user.
-Catalog queries stay outside the interactive SQL buffer and wrapper history.
-Metadata remains in memory for this wrapper session.
+### SQL 주석 힌트 이름
 
-In client/server mode, the first Tab starts a background lookup. The open list
-updates when names arrive. A later Tab refreshes metadata after 60 seconds.
-Submit `;refresh-completions` to request an immediate refresh. This wrapper
-command neither executes SQL nor creates a history entry. A separate connection
-sees committed schema. Its connection target and user remain those selected at
-launch, so restart the wrapper after changing the interactive connection.
+`SELECT /*+ RE`에서 Tab을 누르면 `RECOMPILE`, `REEXECUTE`를 제안합니다.
+`/*+ ... */`, `--+`, `//+` 힌트 주석을 지원하며 여러 힌트와 여러 줄 블록도 처리합니다.
+힌트 이름은 CUBRID 11.5 소스 `cc947788d3b7dc402f46192d0f3299ddcc8563ba`의 스냅샷입니다.
+메타데이터가 없어도 이름을 완성합니다.
+선택 시 힌트 이름 토큰만 대체하고 주변 주석 구분자·SQL·기존 인자를 유지합니다.
+괄호 안의 테이블·인덱스 인자와 일반 주석·문자열에서는 힌트 이름을 제안하지 않습니다.
 
-In standalone mode, a schema lookup finishes before the interactive client
-starts. The wrapper never opens another client while standalone csql owns the
-database. Names therefore reflect the initial snapshot. Restart the wrapper
-to refresh them. The snapshot can add up to three seconds to startup.
+### 카탈로그·테이블·컬럼
 
-Metadata queries use only credentials supplied in the launch arguments. They
-cannot reuse a password typed into csql's interactive prompt. If authentication
-or metadata loading fails, SQL editing and execution remain available, with
-keyword completion. A failed refresh retains previously cached names. Queries
-have a three-second deadline and a 16 MiB output limit. Their processes stop
-when the wrapper exits. Use `--no-completion` to skip all metadata queries.
+시스템 카탈로그 이름과 컬럼은 선택한 데이터베이스의 접근 가능한 `db_`·`_db_` 객체에서 읽습니다.
+`FROM db_in`은 `db_index`, `db_index_key`를 제안하며 카탈로그 별칭도 컬럼을 제공합니다.
+시스템 객체는 리터럴 접두어를 요청하거나 소유자를 지정할 때 표시해 일반 목록에서는 사용자 객체를 우선합니다.
+현재 사용자의 가시성을 유지하며 실제 `_db_` 클래스는 DBA만 볼 수 있습니다.
 
-The default shell is not replaced for wrapper convenience. csql selects
-`CUBRID_CSQL_SHELL`, then `SHELL`, using its normal rules. The real-csql harness
-runs that configured shell once through direct csql and once through the wrapper,
-answers terminal cursor-position queries in both, and requires both paths to
-execute a command and return. On the development host the configured Nushell at
-`/home/linuxbrew/.linuxbrew/bin/nu` issued two cursor-position queries in each
-path and returned successfully; its startup configuration diagnostics were
-therefore treated as direct-csql behavior, not hidden by substituting `/bin/sh`.
-Explicit ordinary-csql fallback for unsupported prompt states is delivered by a
-later ticket and is not claimed here.
+컬럼 완성은 단순 테이블 별칭을 해석합니다.
+`select * from code c where c.na`의 `c.na`를 `c.name`으로 완성할 수 있습니다.
+같은 초안에서 커서 뒤에 있는 테이블도 미완성 SELECT 목록에 컬럼을 제공합니다.
+여러 테이블에서는 모호함을 줄이기 위해 한정되지 않은 컬럼 후보에 별칭을 포함합니다.
+CTE 이름, 파생 테이블 컬럼, 동의어, 상관 쿼리의 외부 별칭과
+CSQL 내부 버퍼에만 남은 SQL 조각은 현재 범위 밖입니다.
 
-## Verification
+### 메타데이터와 갱신
 
-The fast external-process suites use a synthetic csql executable, PTYs, an ANSI
-screen model, and isolated temporary directories. They cover mode-specific help,
-external draft editing, editor selection and quoted arguments, unsuccessful and
-interrupted edits, history isolation, resizing, and terminal/process cleanup:
+Python 드라이버나 편집기 의존성 없이 설치된 `csql`을 사용합니다.
+시작 사용자의 `db_class`, `db_attribute`, `db_index`, `db_user`를 읽습니다.
+카탈로그 쿼리는 대화형 SQL 버퍼와 래퍼 히스토리에 넣지 않습니다.
+메타데이터는 해당 래퍼 세션의 메모리에 보관합니다.
+
+클라이언트/서버 모드에서는 첫 Tab이 백그라운드 조회를 시작하고 이름을 받으면 열린 목록을 갱신합니다.
+이후 Tab 요청 시 60초가 지난 캐시를 갱신합니다.
+`;refresh-completions`는 즉시 갱신을 요청하며 SQL을 실행하거나 히스토리를 만들지 않습니다.
+별도 연결은 커밋된 스키마를 봅니다. 대상·사용자는 시작 시 값이므로 대화형 접속을 바꾸면 래퍼를 재시작하세요.
+
+독립 모드에서는 대화형 클라이언트 시작 전에 조회를 마칩니다.
+독립 CSQL이 DB를 소유하는 동안 다른 클라이언트를 열지 않습니다.
+시작 스냅샷을 사용하므로 갱신하려면 재시작하세요. 스냅샷은 시작 시간을 최대 3초 늘릴 수 있습니다.
+
+조회는 시작 인자의 자격 증명만 사용하며 CSQL 프롬프트에서 입력한 비밀번호를 재사용하지 못합니다.
+인증·조회 실패 시에도 편집·실행과 키워드 완성은 유지합니다.
+갱신 실패 시 기존 캐시 이름을 유지합니다. 조회 제한은 3초와 출력 16MiB입니다.
+종료 시 조회 프로세스도 중지합니다. `--no-completion`은 모든 메타데이터 조회를 생략합니다.
+
+### 기본 셸과 대체 실행 범위
+
+래퍼 편의를 위해 기본 셸을 바꾸지 않습니다. CSQL이 기존 규칙대로 `CUBRID_CSQL_SHELL`, `SHELL`을 선택합니다.
+실제 CSQL 검증은 설정된 셸을 직접 실행과 래퍼 실행에서 한 번씩 열고,
+양쪽의 커서 위치 질의에 응답하며 명령 실행 후 복귀를 확인합니다.
+개발 호스트의 `/home/linuxbrew/.linuxbrew/bin/nu`는 양쪽에서 각각 두 번 질의한 뒤 복귀했습니다.
+시작 설정 진단도 `/bin/sh`로 바꿔 숨기지 않고 직접 CSQL의 동작으로 취급했습니다.
+지원하지 않는 프롬프트 상태에서 일반 CSQL로 명시적으로 전환하는 기능은 후속 티켓이며 현재 제공하지 않습니다.
+
+<a id="verification"></a>
+
+## 검증
+
+빠른 외부 프로세스 테스트는 합성 CSQL, PTY, ANSI 화면 모델, 격리 임시 디렉터리를 사용합니다.
+모드별 도움말, 외부 초안 편집·선택·인용된 인자, 실패·중단 편집,
+히스토리 격리, 크기 변경, 터미널·프로세스 정리를 확인합니다.
 
 ```bash
 just test
 ```
 
-The acceptance harness requires an initialized CUBRID runtime environment with
-`csql` and `cubrid` on `PATH`. It creates two temporary standalone databases and a
-temporary `CUBRID_DATABASES` registry. It also supplies a temporary CUBRID
-runtime root so utility logs and other mutable runtime files stay isolated. The
-harnesses compare noninteractive direct/wrapped calls and exercise editable
-standalone and client/server sessions. They remove their resources on exit:
+실제 검증에는 `PATH`에 `csql`·`cubrid`가 있는 초기화된 CUBRID 환경이 필요합니다.
+검증 도구는 임시 독립 DB 두 개, 임시 `CUBRID_DATABASES` 레지스트리와
+임시 CUBRID 런타임 루트를 사용해 로그 등 변경 파일을 격리합니다.
+비대화형 직접·래퍼 실행을 비교하고 독립·클라이언트/서버 편집 세션을 확인합니다.
+종료할 때 자원을 정리합니다.
 
 ```bash
 uv run python tests/verify_real_csql.py
@@ -405,61 +373,50 @@ uv run python tests/verify_editable_csql.py
 uv run python tests/verify_completion_csql.py
 ```
 
-The real-csql comparison covers pipe, file, command, successful SQL, failing SQL,
-invalid csql options, wrapper-looking csql values, regular-file redirection,
-redirected output, and history non-creation/non-modification. Only elapsed query
-timing is normalized. The editable harness covers standalone and client/server
-queries, errors followed by success, multiline submission, csql automatic and
-explicit execution modes, session commands, prompt-looking output, quiet work,
-and normal exit through the production PTY boundary. It additionally creates a
-temporary password-authenticated user, verifies masked authentication and secret
-exclusion, drives real `less`, `vi`, and `sh` processes through successful,
-interrupted, nonzero, and missing-program returns, changes and executes csql's command buffer
-through `vi`, and proves subsequent enhanced recall/search in the same session.
-It resizes long multibyte drafts and live less, vi, and shell handoffs; the shell
-checks its received dimensions and the returning editor checks its current
-screen, result output, prompt, and status bar. It compares running-query Ctrl+C
-directly with wrapped csql, verifies a successful later query, classifies the
-bounded six-way catalog-query observation using plan output, and compares direct
-and wrapped SIGTERM status, exact terminal settings, and process cleanup.
-The configured default shell is compared with direct csql without overriding
-the user's selection. The harness also validates SQLite
-submission boundaries, restart recall and editing, draft restoration,
-failed-command capture, leading-space exclusion, and read-only `--no-history`
-against real csql. History search coverage includes multiline all-term matching,
-cancellation, no-match safety, editable non-executing recall, deduplication,
-latest-use order, and keyboard selection. The synthetic screen tests additionally
-cover logical-line navigation and picker lifecycle in narrow and short terminals.
-Shared-history coverage keeps two wrappers live across different launch
-directories and database targets, checks browse and search refresh, runs
-concurrent insert-and-prune work, validates configured and default retention
-boundaries, confirms retained order through wrapper recall, and checks the actual
-WAL journal mode and sidecars. Direct SQLite queries supplement the wrapper
-observations with exact stored-row counts. Storage-failure coverage uses the
-running wrapper with an unavailable destination and an actual SQLite writer
-lock held beyond the busy timeout. It checks the warning and visible mode,
-continued SQL execution and recall, the no-retry behavior after releasing the
-lock, and the durable-versus-volatile boundary after restart.
+직접 비교는 파이프·파일·명령, 성공·실패 SQL, 잘못된 CSQL 옵션,
+래퍼 옵션처럼 보이는 CSQL 값, 일반 파일·출력 리다이렉션,
+히스토리 미생성·미변경을 다룹니다. 쿼리 경과 시간만 정규화합니다.
 
-## Prototype provenance
+편집 검증은 독립·클라이언트/서버 쿼리, 오류 후 성공, 여러 줄 제출,
+CSQL 자동·명시 실행, 세션 명령, 프롬프트 같은 출력, 조용한 작업과 정상 종료를 실제 PTY 경계로 확인합니다.
+임시 비밀번호 사용자를 만들고 마스킹·비밀 입력 제외를 검증합니다.
+실제 `less`, `vi`, `sh`의 성공·중단·실패·프로그램 부재 복귀와
+`vi`로 CSQL 명령 버퍼를 바꾼 뒤 실행하고 같은 세션에서 검색·불러오기를 확인합니다.
 
-The separate throwaway prototype remains at
-`/home/vimkim/gh/cb/csql-with-history-prototype`, branch
-`prototype/csql-with-history`, inspected at commit `9394e38`. Its process-replace
-bypass and comparison patterns informed this slice, but its Python packages,
-PTY transport, SQLite layout, journal mode, and timeout choices are neither
-runtime dependencies nor production requirements here.
+긴 멀티바이트 초안과 실행 중 less·vi·셸의 크기를 바꿉니다.
+셸이 받은 크기와 복귀 편집기의 화면·결과·프롬프트·상태줄을 확인합니다.
+쿼리 실행 중 Ctrl+C를 직접 실행과 비교하고 다음 쿼리 성공,
+6중 카탈로그 쿼리의 제한 시간 관찰, SIGTERM 상태·터미널 설정 전체·프로세스 정리를 확인합니다.
+사용자 기본 셸을 변경하지 않고 직접 실행과 비교합니다.
 
-## Extraction provenance and remaining work
+실제 CSQL에서 SQLite 제출 경계, 재시작 불러오기·편집, 초안 복원,
+실패 명령 저장, 선행 공백 제외, 읽기 전용 `--no-history`를 검증합니다.
+검색은 여러 줄 전체 검색어 매칭, 취소, 결과 없음, 실행 없는 불러오기,
+중복 제거, 최신 사용 순서와 키 선택을 다룹니다.
+합성 화면 검증은 좁고 낮은 터미널의 논리 줄 이동과 목록 수명도 확인합니다.
 
-This standalone project was extracted from `CUBRID/CUBRID` worktree
-`/home/vimkim/gh/cb/csql-with-history`, branch `csql-with-history`, committed
-revision `27fe60a090d6ceefcc815014270d8eee14c4556c` (2026-09-17).
-Existing Apache-2.0 source notices and the license are preserved.
-The original worktree's uncommitted ticket 09 implementation was not included.
+공유 히스토리는 서로 다른 실행 디렉터리·DB 대상의 래퍼 두 개를 계속 실행한 상태에서
+탐색·검색 갱신, 동시 삽입·보관 한도 정리, 기본·지정 한도, 불러오기 순서,
+실제 WAL 모드·보조 파일을 확인합니다. 직접 SQLite 조회로 정확한 저장 행 수도 확인합니다.
+저장 실패 검증은 사용할 수 없는 경로와 busy timeout을 넘긴 실제 쓰기 잠금을 사용합니다.
+경고·표시 모드, 계속되는 실행·검색, 잠금 해제 후 재시도하지 않는 동작,
+재시작 후 영구·휘발성 제출 경계를 확인합니다.
 
-This packaging task does not finish the original tickets 09–10: explicit
-ordinary-csql fallback for unsupported prompt states and the complete integrated
-production acceptance matrix remain pending in work-tracker item 172.
-The completion implementation and its verification progress are recorded in
-[the completion checklist](completion-plan.md).
+## 프로토타입 출처
+
+별도 일회용 프로토타입은 `/home/vimkim/gh/cb/csql-with-history-prototype`,
+브랜치 `prototype/csql-with-history`, 확인 커밋 `9394e38`에 남아 있습니다.
+프로세스 교체와 비교 방식은 참고했지만, Python 패키지·PTY 전송·SQLite 구조·저널 모드·
+timeout 선택은 이 프로젝트의 실행 의존성이나 필수 요건이 아닙니다.
+
+## 추출 이력과 남은 작업
+
+이 독립 프로젝트는 `CUBRID/CUBRID`의 `/home/vimkim/gh/cb/csql-with-history`,
+브랜치 `csql-with-history`, 커밋 `27fe60a090d6ceefcc815014270d8eee14c4556c`에서
+2026-09-17에 추출했습니다. 기존 Apache-2.0 고지와 라이선스를 보존합니다.
+원본 작업 트리의 미커밋 티켓 09 구현은 포함하지 않았습니다.
+
+이 패키징 작업으로 원본 티켓 09–10이 완료된 것은 아닙니다.
+지원하지 않는 프롬프트 상태의 명시적 일반 CSQL 대체 실행과 전체 통합 운영 검증 행렬은
+작업 기록 172에 남아 있습니다.
+자동 완성의 구현·검증 이력은 [체크리스트](completion-plan.md)에 있습니다.
