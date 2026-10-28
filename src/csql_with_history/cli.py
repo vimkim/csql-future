@@ -591,7 +591,11 @@ class DraftEditor:
           if not self.draft.text[:self.draft.cursor].strip():
             self.draft.insert("\t")
           else:
-            self.completion.open(self.draft.text, self.draft.cursor, suggest(self.draft.text, self.draft.cursor))
+            suggestions = suggest(self.draft.text, self.draft.cursor)
+            if suggestions.allowed:
+              self.completion.open(self.draft.text, self.draft.cursor, suggestions)
+            else:
+              self.draft.insert("\t")
           self._render()
           continue
         if event.action is EditorAction.EOF:

@@ -9,7 +9,7 @@ the installed `csql`. No new Python runtime dependency is required.
 
 - [x] **1. Completion menu.** Add Tab, Ctrl+N/P, Enter, and Esc handling.
   Enter accepts a candidate without submitting SQL. Other modes retain their keys.
-- [ ] **2. SQL context.** Detect table positions in unfinished SQL. Replace the
+- [x] **2. SQL context.** Detect table positions in unfinished SQL. Replace the
   identifier at the cursor. Respect comments, strings, owners, and quoted names.
 - [ ] **3. Catalog provider.** Fetch accessible tables and columns through a
   bounded background `csql` process in client/server mode. Parse plain output.
@@ -45,7 +45,8 @@ Metadata failure leaves SQL editing and execution available.
 - Created work item 560 and a separate worktree from `main` at `0e95b34`.
 - Preserved the separate help/editor task and the older fallback task.
 - Menu implementation and focused PTY verification are complete.
-- Next action: add SQL context detection and identifier replacement.
+- SQL context and full identifier replacement are complete.
+- Next action: connect the catalog provider and its bounded process lifecycle.
 
 ## Verification log
 
@@ -58,3 +59,6 @@ full run passed 59 tests and exposed that obsolete Tab expectation.
 Read this checklist and work item 560. Inspect the current branch and status.
 Continue the first unchecked implementation step. Record each result and its
 verification before starting the next step.
+
+Step 2: six SQL-context tests passed. Cases include relation positions, owners,
+quotes, replacement suffixes, comments, strings, aliases, and nested scopes.
