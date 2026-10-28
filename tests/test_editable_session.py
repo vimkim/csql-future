@@ -499,6 +499,39 @@ finally:
     session.read_until(b'EXECUTED=["select\\t42;"]')
     self.assertFalse((self.root / 'catalog.log').exists())
 
+  def test_standalone_snapshot_finishes_before_input_and_never_refreshes_live(self) -> None:
+    self.enable_catalog()
+    self.environment['SYNTHETIC_CATALOG_DELAY'] = '0.1'
+    session = self.start(['-S', '-u', 'dba'])
+    session.read_until(b'csql-with-history>')
+    record = json.loads((self.root / 'catalog.log').read_text())
+    wait_for_process_exit(record['pid'])
+    self.assertEqual('-S', record['arguments'][0])
+    session.send(b'select * from co\t')
+    session.read_until(b'> code  table DBA')
+    session.send(b'\x0e\r;\r')
+    session.read_until(b'EXECUTED=["select * from coding;"]')
+    session.read_until(b'csql-with-history>')
+    session.send(b';refresh-completions\r')
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'restart to refresh schema')
+    self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
+
+  def test_failed_standalone_snapshot_keeps_interactive_password_input_owned_by_csql(self) -> None:
+    self.environment['SYNTHETIC_CATALOG_FAIL'] = '1'
+    self.environment['SYNTHETIC_PASSWORD'] = 'test-only-password'
+    session = self.start(['-S', '-u', 'dba'])
+    session.read_until(b'Password: ')
+    session.send(b'test-only-password\r')
+    session.read_until(b'csql-with-history>')
+    session.send(b'sel\t')
+    session.read_until(b'> SELECT  keyword')
+    session.send(b'\r 42;\r')
+    session.read_until(b'EXECUTED=["SELECT 42;"]')
+    self.assertEqual(['SELECT 42;'], self.stored_commands())
+    self.assertNotIn(b'test-only-password', bytes(session.output))
+
   def test_unix_editing_keys_preserve_the_draft_around_the_cursor(self) -> None:
     cases = (
       (b"select 12;\x01\x06\x06\x05\x02\x02\x04\r", "select 1;"),

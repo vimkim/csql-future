@@ -104,7 +104,9 @@ class CatalogCache:
       if self.connection is None or self.stop.is_set():
         return
       if self.connection.standalone:
-        self.message = 'Standalone schema snapshot is not available yet'
+        if force:
+          self.message = 'Standalone snapshot: restart to refresh schema'
+          self.revision += 1
         return
       if self.worker is not None and self.worker.is_alive():
         return
@@ -114,6 +116,14 @@ class CatalogCache:
       self.revision += 1
       self.worker = threading.Thread(target=self._load, daemon=True, name='csql-catalog')
       self.worker.start()
+
+  def prepare_standalone(self) -> None:
+    """Run once before the interactive client acquires the standalone DB."""
+    if self.connection is not None and self.connection.standalone:
+      self._load()
+      with self.lock:
+        if not self.message:
+          self.message = 'Standalone schema snapshot'
 
   def _load(self) -> None:
     try:

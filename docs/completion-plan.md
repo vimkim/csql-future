@@ -13,7 +13,7 @@ the installed `csql`. No new Python runtime dependency is required.
   identifier at the cursor. Respect comments, strings, owners, and quoted names.
 - [x] **3. Catalog provider.** Fetch accessible tables and columns through a
   bounded background `csql` process in client/server mode. Parse plain output.
-- [ ] **4. Standalone snapshot.** Fetch metadata before the standalone client
+- [x] **4. Standalone snapshot.** Fetch metadata before the standalone client
   starts. Close the metadata client before starting the interactive client.
   Do not capture password keystrokes or query a second client during standalone use.
 - [ ] **5. Cache and columns.** Cache metadata per session. Refresh client/server
@@ -47,7 +47,8 @@ Metadata failure leaves SQL editing and execution available.
 - Menu implementation and focused PTY verification are complete.
 - SQL context and full identifier replacement are complete.
 - Client/server catalog loading and process cleanup are complete.
-- Next action: add the sequential standalone snapshot.
+- Standalone snapshot ordering and authentication fallback are complete.
+- Next action: finish cache, column, failure, and credential verification.
 
 ## Verification log
 
@@ -67,3 +68,7 @@ quotes, replacement suffixes, comments, strings, aliases, and nested scopes.
 Step 3: catalog PTY tests passed. They verify asynchronous menu updates, cache
 reuse, explicit refresh, responsive editing during a slow query, and process
 cleanup on exit. All nine launch/bypass tests passed.
+
+Step 4: standalone PTY tests passed. They prove the snapshot process exits
+before input, live standalone refresh starts no client, and failed metadata
+authentication preserves csql-owned password input and excludes secrets from history.

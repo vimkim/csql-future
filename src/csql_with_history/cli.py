@@ -1543,6 +1543,9 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
   try:
     if options.completion:
       catalog = CatalogCache(executable, completion_connection(arguments))
+      # Passwords remain csql-owned. Batch lookup uses only explicit credentials.
+      # A failed snapshot must finish before interactive authentication begins.
+      catalog.prepare_standalone()
     terminal = CsqlTerminal(executable, arguments, previous_signal_mask)
     signal_mask_restored = True
     signal.pthread_sigmask(signal.SIG_SETMASK, previous_signal_mask)
