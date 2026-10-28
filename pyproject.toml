@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "csql-with-history"
+version = "0.1.0"
+description = "Editable CUBRID csql sessions with persistent searchable history."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.scripts]
+csql-with-history = "csql_with_history.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/csql_with_history"]

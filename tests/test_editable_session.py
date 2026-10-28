@@ -1,0 +1,1131 @@
+#!/usr/bin/env python3
+#
+# Copyright 2008 Search Solution Corporation
+# Copyright 2016 CUBRID Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""External-process tests for the editable csql session."""
+
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
+import os
+from pathlib import Path
+import signal
+import sqlite3
+import sys
+import tempfile
+import threading
+import time
+import unittest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WRAPPER = Path(os.environ.get("CSQL_WITH_HISTORY_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-with-history")))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from pty_test_support import AnsiScreen, TerminalSession, wait_for_process_exit
+
+
+class EditableSessionTest(unittest.TestCase):
+
+  def setUp(self) -> None:
+    temporary_directory = tempfile.TemporaryDirectory()
+    self.addCleanup(temporary_directory.cleanup)
+    self.root = Path(temporary_directory.name)
+    self.bin_directory = self.root / "bin"
+    self.bin_directory.mkdir()
+    self.csql = self.bin_directory / "csql"
+    self.csql.write_text(
+      """#!/usr/bin/env python3
+import json
+import os
+import sys
+import termios
+import time
+import tty
+
+prompt = os.environ.get("CUBRID_CSQL_PROMPT", "csql") + "> "
+command_buffer = []
+automatic = True
+pid_file = os.environ.get("SYNTHETIC_PID_FILE")
+if pid_file is not None:
+  with open(pid_file, "w", encoding="ascii") as stream:
+    stream.write(str(os.getpid()))
+expected_password = os.environ.get("SYNTHETIC_PASSWORD")
+startup_status = os.environ.get("SYNTHETIC_STARTUP_STATUS")
+if startup_status is not None:
+  sys.exit(int(startup_status))
+if expected_password is not None:
+  previous = termios.tcgetattr(0)
+  attributes = termios.tcgetattr(0)
+  attributes[3] &= ~termios.ECHO
+  termios.tcsetattr(0, termios.TCSANOW, attributes)
+  try:
+    sys.stdout.write("Password: ")
+    sys.stdout.flush()
+    supplied_password = sys.stdin.readline().rstrip("\\r\\n")
+  finally:
+    termios.tcsetattr(0, termios.TCSADRAIN, previous)
+  if supplied_password != expected_password:
+    print("AUTHENTICATION-FAILED", flush=True)
+    sys.exit(1)
+  print("AUTHENTICATED", flush=True)
+print("Synthetic csql ready", flush=True)
+
+while True:
+  previous = termios.tcgetattr(0)
+  sys.stdout.write(prompt)
+  sys.stdout.flush()
+  time.sleep(0.03)
+  tty.setraw(0)
+  line = bytearray()
+  while True:
+    character = os.read(0, 1)
+    if character in (b"\\r", b"\\n"):
+      break
+    if character == b"\\x04" and not line:
+      termios.tcsetattr(0, termios.TCSADRAIN, previous)
+      sys.exit(0)
+    line.extend(character)
+  termios.tcsetattr(0, termios.TCSADRAIN, previous)
+  text = line.decode()
+  print(text, flush=True)
+  if text == ";exit":
+    sys.exit(0)
+  if text == ";singleline off":
+    automatic = False
+    print("SINGLELINE IS OFF", flush=True)
+    continue
+  if text == ";singleline on":
+    automatic = True
+    print("SINGLELINE IS ON", flush=True)
+    continue
+  if text == ";xrun":
+    print("EXECUTED=" + json.dumps(command_buffer), flush=True)
+    command_buffer.clear()
+    continue
+  if text == ";shell":
+    status = os.system(os.environ["CUBRID_CSQL_SHELL"])
+    print("SHELL-STATUS={}".format(status), flush=True)
+    continue
+  if text == ";rawhandoff":
+    os.system(os.environ["SYNTHETIC_RAW_HANDOFF"])
+    continue
+  command_buffer.append(text)
+  if text == "promptlike;":
+    print(prompt, flush=True)
+    time.sleep(0.35)
+    print("PROMPT-LIKE WORK FINISHED", flush=True)
+  elif text == "quiet;":
+    time.sleep(0.35)
+    print("QUIET WORK FINISHED", flush=True)
+  elif text == "slow;":
+    try:
+      time.sleep(10)
+    except KeyboardInterrupt:
+      print("ERROR: synthetic interrupted", flush=True)
+  elif text == "bad;":
+    print("ERROR: synthetic failure", flush=True)
+  if automatic and text.rstrip().endswith(";"):
+    print("EXECUTED=" + json.dumps(command_buffer), flush=True)
+    command_buffer.clear()
+""",
+      encoding="utf-8",
+    )
+    self.csql.chmod(0o755)
+    self.raw_handoff = self.bin_directory / "raw-handoff"
+    self.raw_handoff.write_text(
+      """#!/usr/bin/env python3
+import os
+import sys
+import termios
+import time
+import tty
+
+previous = termios.tcgetattr(0)
+try:
+  tty.setraw(0)
+  sys.stdout.write(os.environ["CUBRID_CSQL_PROMPT"] + "> ")
+  sys.stdout.flush()
+  time.sleep(0.35)
+  size = os.get_terminal_size(0)
+  print("RAW-HANDOFF-SIZE={}x{}".format(size.lines, size.columns), flush=True)
+  print("RAW-HANDOFF-FINISHED", flush=True)
+finally:
+  termios.tcsetattr(0, termios.TCSADRAIN, previous)
+""",
+      encoding="utf-8",
+    )
+    self.raw_handoff.chmod(0o755)
+    self.environment = os.environ.copy()
+    self.environment["PATH"] = os.pathsep.join((str(self.bin_directory), self.environment.get("PATH", "")))
+    self.environment["SYNTHETIC_RAW_HANDOFF"] = str(self.raw_handoff)
+
+  def start(
+    self,
+    arguments: list[str] | None = None,
+    cwd: Path | None = None,
+    database: str = "synthetic_db",
+  ) -> TerminalSession:
+    session = TerminalSession(
+      [str(WRAPPER), *(arguments or []), database],
+      cwd or self.root,
+      self.environment,
+    )
+    self.addCleanup(session.close)
+    return session
+
+  def stored_commands(self, path: Path | None = None) -> list[str]:
+    selected = path or self.root / ".csql_history.sqlite3"
+    with closing(sqlite3.connect(selected)) as connection:
+      return [row[0] for row in connection.execute("SELECT command FROM submissions ORDER BY id")]
+
+  def rendered_screen(self, session: TerminalSession) -> str:
+    screen = AnsiScreen(rows=24, columns=100)
+    screen.feed(bytes(session.output))
+    return "\n".join(screen.display())
+
+  def test_multiline_history_survives_restart_and_recall_is_editable(self) -> None:
+    first = self.start()
+    first.read_until(b"csql-with-history>")
+    first.send(b"select\x0a42;\r")
+    first.read_until(b'EXECUTED=["select", "42;"]')
+    first.read_until(b"csql-with-history>")
+    first.send(b"\x04")
+    self.assertEqual(0, first.wait())
+
+    restarted = self.start()
+    restarted.read_until(b"csql-with-history>")
+    restarted.send(b"\x1b[A")
+    recalled = restarted.read_for(0.1)
+    self.assertIn(b"select", recalled)
+    self.assertIn(b"42;", recalled)
+    self.assertNotIn(b"EXECUTED", recalled)
+
+    restarted.send(b"\x1b[F changed\r")
+    restarted.read_until(b'EXECUTED=["select changed", "42;"]')
+
+  def test_history_search_escape_restores_draft_and_cursor(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select searchable;\r")
+    session.read_until(b'EXECUTED=["select searchable;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"select tail;\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D\x12search\x1b")
+    session.read_for(0.1)
+    session.send(b" restored\r")
+    session.read_until(b'EXECUTED=["select restored tail;"]')
+
+  def test_history_search_matches_all_terms_across_multiline_and_recalls_for_editing(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"SELECT Alpha\x0aFROM Multiline;\r")
+    session.read_until(b'EXECUTED=["SELECT Alpha", "FROM Multiline;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"select unrelated;\r")
+    session.read_until(b'EXECUTED=["select unrelated;"]')
+    session.read_until(b"csql-with-history>")
+
+    before = len(session.output)
+    session.send(b"unfinished\x12alpha MULTILINE")
+    session.read_for(0.1)
+    screen = self.rendered_screen(session)
+    self.assertIn("SELECT Alpha", screen)
+    self.assertIn("FROM Multiline;", screen)
+    session.send(b"\r")
+    recalled = session.read_for(0.1)
+    self.assertNotIn(b"EXECUTED", bytes(session.output[before:]) + recalled)
+    session.send(b"changed \r")
+    session.read_until(b'EXECUTED=["changed SELECT Alpha", "FROM Multiline;"]')
+
+  def test_history_search_deduplicates_by_latest_use_and_down_selects_older_match(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    for command in ("select target_repeat;", "select target_distinct;", "select target_repeat;"):
+      session.send(command.encode("ascii") + b"\r")
+      session.read_until(('EXECUTED=["{}"]'.format(command)).encode("ascii"))
+      session.read_until(b"csql-with-history>")
+
+    self.assertEqual(
+      ["select target_repeat;", "select target_distinct;", "select target_repeat;"],
+      self.stored_commands(),
+    )
+    session.send(b"draft\x12target")
+    session.read_for(0.1)
+    screen = self.rendered_screen(session)
+    overlay = screen.split("History search:", 1)[1].split("History |", 1)[0]
+    self.assertEqual(1, overlay.count("select target_repeat;"), screen)
+    self.assertEqual(1, overlay.count("select target_distinct;"), screen)
+    selected = next(line for line in overlay.splitlines() if line.lstrip().startswith("> "))
+    self.assertIn("select target_repeat;", selected)
+
+    session.send(b"\x1b[B\r")
+    recalled = session.read_for(0.1)
+    self.assertNotIn(b"EXECUTED", recalled)
+    self.assertIn("select target_distinct;", self.rendered_screen(session))
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select target_distinct;"]')
+
+  def test_configured_retention_counts_duplicates_and_keeps_latest_use_order(self) -> None:
+    session = self.start(["--history-limit", "3"])
+    session.read_until(b"csql-with-history>")
+    for command in ("select first;", "select repeat;", "select middle;", "select repeat;"):
+      session.send(command.encode("ascii") + b"\r")
+      session.read_until(('EXECUTED=["{}"]'.format(command)).encode("ascii"))
+      session.read_until(b"csql-with-history>")
+
+    self.assertEqual(
+      ["select repeat;", "select middle;", "select repeat;"],
+      self.stored_commands(),
+    )
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select repeat;", self.rendered_screen(session))
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select middle;", self.rendered_screen(session))
+
+  def test_default_retention_keeps_latest_ten_thousand_and_deduplicates_recall(self) -> None:
+    history_file = self.root / "default-retention.sqlite3"
+    arguments = ["--history-file", str(history_file)]
+    initializer = self.start(arguments)
+    initializer.read_until(b"csql-with-history>")
+    initializer.send(b"\x04")
+    self.assertEqual(0, initializer.wait())
+
+    seeded = [
+      ("select boundary_{:05d};".format(number),)
+      for number in range(9_999)
+    ]
+    with closing(sqlite3.connect(history_file)) as connection:
+      with connection:
+        connection.executemany("INSERT INTO submissions(command) VALUES (?)", seeded)
+
+    first = self.start(arguments, database="default_target_one")
+    second = self.start(arguments, database="default_target_two")
+    first.read_until(b"csql-with-history>")
+    second.read_until(b"csql-with-history>")
+
+    def submit_duplicate(session: TerminalSession) -> None:
+      session.send(b"select newest_default;\r")
+      session.read_until(b'EXECUTED=["select newest_default;"]')
+      session.read_until(b"csql-with-history>")
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+      futures = (
+        executor.submit(submit_duplicate, first),
+        executor.submit(submit_duplicate, second),
+      )
+      for future in futures:
+        future.result()
+
+    retained = self.stored_commands(history_file)
+    self.assertEqual(10_000, len(retained))
+    self.assertEqual("select boundary_00001;", retained[0])
+    self.assertEqual(["select newest_default;", "select newest_default;"], retained[-2:])
+
+    first.send(b"\x12newest_default")
+    first.read_for(0.05)
+    overlay = self.rendered_screen(first).split("History search:", 1)[1].split("History |", 1)[0]
+    self.assertEqual(1, overlay.count("select newest_default;"))
+
+  def test_history_search_no_match_and_navigation_boundaries_never_submit_the_draft(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select retained;\r")
+    session.read_until(b'EXECUTED=["select retained;"]')
+    session.read_until(b"csql-with-history>")
+
+    before = len(session.output)
+    session.send(b"select safe;\x12missing\x1b[A\x1b[B\r")
+    session.read_for(0.1)
+    self.assertIn("(no matches)", self.rendered_screen(session))
+    self.assertNotIn(b"EXECUTED", bytes(session.output[before:]))
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select safe;"]')
+
+  def test_ctrl_c_closes_the_picker_and_clears_the_unfinished_draft(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select retained;\r")
+    session.read_until(b'EXECUTED=["select retained;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"discard this draft\x12retained")
+    session.read_for(0.1)
+    self.assertIn("History search:", self.rendered_screen(session))
+    session.send(b"\x03select after_picker_interrupt;\r")
+    completed = session.read_until(b'EXECUTED=["select after_picker_interrupt;"]')
+    self.assertNotIn(b"discard this draft\r\n", completed)
+    session.read_until(b"csql-with-history>")
+    self.assertEqual(
+      ["select retained;", "select after_picker_interrupt;"],
+      self.stored_commands(),
+    )
+
+  def test_history_picker_is_prompt_oriented_and_closes_cleanly_in_a_narrow_window(self) -> None:
+    session = self.start()
+    session.set_size(16, 30)
+    session.read_until(b"csql-with-history>")
+    session.send(b"select 7;\r")
+    session.read_until(b'EXECUTED=["select 7;"]')
+    session.read_until(b"csql-with-history>")
+    session.send("미완성-draft-abcdefghijklmnopqrstuvwxyz".encode("utf-8") + b"\x12select")
+    session.read_for(0.1)
+
+    picker = AnsiScreen(rows=16, columns=30)
+    picker.feed(bytes(session.output))
+    picker_lines = picker.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in picker_lines), picker_lines)
+    self.assertEqual(1, sum("History search:" in line for line in picker_lines), picker_lines)
+    self.assertEqual(1, sum("History |" in line for line in picker_lines), picker_lines)
+    self.assertTrue(any("> select 7;" in line for line in picker_lines), picker_lines)
+
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    editor = AnsiScreen(rows=16, columns=30)
+    editor.feed(bytes(session.output))
+    editor_lines = editor.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in editor_lines), editor_lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in editor_lines), editor_lines)
+    self.assertEqual(0, sum("History search:" in line for line in editor_lines), editor_lines)
+    self.assertTrue(any('EXECUTED=["select 7;"]' in line for line in editor_lines), editor_lines)
+
+  def test_up_and_down_edit_logical_lines_before_browsing_history(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select older;\r")
+    session.read_until(b'EXECUTED=["select older;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"abcde\x0axy\x0a12345;\x1b[A!\x1b[A!\x1b[B\x1b[B!\r")
+    session.read_until(b'EXECUTED=["abc!de", "xy!", "123!45;"]')
+
+  def test_history_picker_keeps_prompt_and_selected_match_visible_in_a_short_window(self) -> None:
+    session = self.start()
+    session.set_size(8, 28)
+    session.read_until(b"csql-with-history>")
+    for number in range(8):
+      command = "select window_{};".format(number)
+      session.send(command.encode("ascii") + b"\r")
+      session.read_until(('EXECUTED=["{}"]'.format(command)).encode("ascii"))
+      session.read_until(b"csql-with-history>")
+
+    session.send(b"draft\x12window")
+    session.read_for(0.1)
+    opened = AnsiScreen(rows=8, columns=28)
+    opened.feed(bytes(session.output))
+    opened_lines = opened.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in opened_lines), opened_lines)
+    self.assertEqual(1, sum("History |" in line for line in opened_lines), opened_lines)
+
+    session.send(b"\x1b[B" * 7)
+    session.read_for(0.1)
+    moved = AnsiScreen(rows=8, columns=28)
+    moved.feed(bytes(session.output))
+    moved_lines = moved.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in moved_lines), moved_lines)
+    self.assertTrue(any("> select window_0;" in line for line in moved_lines), moved_lines)
+    session.send(b"\r\r")
+    session.read_until(b'EXECUTED=["select window_0;"]')
+
+  def test_history_picker_keeps_prompt_visible_with_a_tall_multibyte_draft(self) -> None:
+    session = self.start()
+    session.set_size(8, 20)
+    session.read_until(b"csql-with-history>")
+    session.send(b"select retained;\r")
+    session.read_until(b'EXECUTED=["select retained;"]')
+    session.read_until(b"csql-with-history>")
+
+    draft = "select '" + "한글" * 30 + "';"
+    session.send(draft.encode("utf-8") + b"\x12retained")
+    session.read_for(0.1)
+    picker = AnsiScreen(rows=8, columns=20)
+    picker.feed(bytes(session.output))
+    picker_lines = picker.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in picker_lines), picker_lines)
+    self.assertEqual(1, sum("History |" in line for line in picker_lines), picker_lines)
+    self.assertTrue(any("한글" in line for line in picker_lines), picker_lines)
+
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    editor = AnsiScreen(rows=8, columns=20)
+    editor.feed(bytes(session.output))
+    editor_lines = editor.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in editor_lines), editor_lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in editor_lines), editor_lines)
+
+  def test_submission_boundaries_duplicates_failed_commands_and_draft_restoration(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    submissions = (
+      (b";singleline off\r", b"SINGLELINE IS OFF"),
+      (b"select\r", b"select\r"),
+      (b"42;\r", b"42;\r"),
+      (b";xrun\r", b'EXECUTED=["select", "42;"]'),
+      (b";singleline on\r", b"SINGLELINE IS ON"),
+      (b"bad;\r", b"ERROR: synthetic failure"),
+      (b"select\x0a84;\r", b'EXECUTED=["select", "84;"]'),
+      (b"bad;\r", b"ERROR: synthetic failure"),
+    )
+    for keys, expected in submissions:
+      session.send(keys)
+      session.read_until(expected)
+      session.read_until(b"csql-with-history>")
+    session.send(b"\x04")
+    self.assertEqual(0, session.wait())
+
+    self.assertEqual(
+      [
+        ";singleline off",
+        "select",
+        "42;",
+        ";xrun",
+        ";singleline on",
+        "bad;",
+        "select\n84;",
+        "bad;",
+      ],
+      self.stored_commands(),
+    )
+
+    recalled = self.start()
+    recalled.read_until(b"csql-with-history>")
+    recalled.send(b"unfinished")
+    recalled.read_for(0.05)
+    recalled.send(b"\x1b[A")
+    recalled.read_for(0.05)
+    self.assertIn("bad;", self.rendered_screen(recalled))
+    recalled.send(b"\x1b[A\x1b[A")
+    recalled.read_for(0.05)
+    self.assertIn(";singleline on", self.rendered_screen(recalled))
+    recalled.send(b"\x1b[B\x1b[B\x1b[B")
+    recalled.read_for(0.05)
+    self.assertIn("unfinished", self.rendered_screen(recalled))
+
+  def test_leading_space_and_no_history_do_not_save_but_existing_history_is_recalled(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b"select retained;\r")
+    session.read_until(b'EXECUTED=["select retained;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b" select hidden;\r")
+    session.read_until(b'EXECUTED=[" select hidden;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x04")
+    self.assertEqual(0, session.wait())
+    before = self.stored_commands()
+    self.assertEqual(["select retained;"], before)
+
+    private = self.start(["--no-history"])
+    private.read_until(b"csql-with-history>")
+    private.send(b"\x1b[A")
+    private.read_for(0.05)
+    self.assertIn("select retained;", self.rendered_screen(private))
+    private.send(b"\r")
+    private.read_until(b'EXECUTED=["select retained;"]')
+    private.read_until(b"csql-with-history>")
+    private.send(b"select disabled;\r")
+    private.read_until(b'EXECUTED=["select disabled;"]')
+    private.read_until(b"csql-with-history>")
+    private.send(b"\x04")
+    self.assertEqual(0, private.wait())
+    self.assertEqual(before, self.stored_commands())
+
+  def test_default_directories_are_isolated_and_relative_explicit_paths_share(self) -> None:
+    first_directory = self.root / "first"
+    second_directory = self.root / "second"
+    first_directory.mkdir()
+    second_directory.mkdir()
+
+    first = self.start(cwd=first_directory)
+    first.read_until(b"csql-with-history>")
+    first.send(b"select directory_one;\r")
+    first.read_until(b'EXECUTED=["select directory_one;"]')
+    first.read_until(b"csql-with-history>")
+    first.send(b"\x04")
+    self.assertEqual(0, first.wait())
+
+    isolated = self.start(cwd=second_directory)
+    isolated.read_until(b"csql-with-history>")
+    isolated.send(b"\x1b[A")
+    isolated.read_for(0.05)
+    self.assertNotIn("directory_one", self.rendered_screen(isolated))
+    isolated.send(b"\x04")
+    self.assertEqual(0, isolated.wait())
+
+    shared_from_first = self.start(["--history-file", "../shared.sqlite3"], first_directory)
+    shared_from_first.read_until(b"csql-with-history>")
+    shared_from_first.send(b"select shared;\r")
+    shared_from_first.read_until(b'EXECUTED=["select shared;"]')
+    shared_from_first.read_until(b"csql-with-history>")
+    shared_from_first.send(b"\x04")
+    self.assertEqual(0, shared_from_first.wait())
+
+    shared_from_second = self.start(["--history-file=../shared.sqlite3"], second_directory)
+    shared_from_second.read_until(b"csql-with-history>")
+    shared_from_second.send(b"\x1b[A")
+    shared_from_second.read_for(0.05)
+    self.assertIn("select shared;", self.rendered_screen(shared_from_second))
+
+    self.assertEqual(["select directory_one;"], self.stored_commands(first_directory / ".csql_history.sqlite3"))
+    self.assertEqual([], self.stored_commands(second_directory / ".csql_history.sqlite3"))
+    self.assertEqual(["select shared;"], self.stored_commands(self.root / "shared.sqlite3"))
+
+  def test_live_sessions_refresh_shared_history_on_browse_and_search(self) -> None:
+    first_directory = self.root / "live-first"
+    second_directory = self.root / "live-second"
+    first_directory.mkdir()
+    second_directory.mkdir()
+    shared_history = self.root / "live-shared.sqlite3"
+    history_arguments = ["--history-file", str(shared_history)]
+
+    receiver = self.start(history_arguments, first_directory, "target_one")
+    writer = self.start(history_arguments, second_directory, "target_two")
+    receiver.read_until(b"csql-with-history>")
+    writer.read_until(b"csql-with-history>")
+
+    writer.send(b"select shared_browse;\r")
+    writer.read_until(b'EXECUTED=["select shared_browse;"]')
+    writer.read_until(b"csql-with-history>")
+    receiver.send(b"\x1b[A")
+    receiver.read_for(0.05)
+    self.assertIn("select shared_browse;", self.rendered_screen(receiver))
+    receiver.send(b"\x1b[B")
+
+    writer.send(b"select shared_search;\r")
+    writer.read_until(b'EXECUTED=["select shared_search;"]')
+    writer.read_until(b"csql-with-history>")
+    receiver.send(b"draft\x12shared_search")
+    receiver.read_for(0.05)
+    self.assertIn("select shared_search;", self.rendered_screen(receiver))
+    self.assertEqual(
+      ["select shared_browse;", "select shared_search;"],
+      self.stored_commands(shared_history),
+    )
+
+  def test_shared_history_uses_wal_with_live_reader_writer_sidecars(self) -> None:
+    history_file = self.root / "wal-history.sqlite3"
+    session = self.start(["--history-file", str(history_file)])
+    session.read_until(b"csql-with-history>")
+
+    with closing(sqlite3.connect(history_file)) as connection:
+      journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
+
+    self.assertEqual("wal", journal_mode)
+    self.assertTrue(Path(str(history_file) + "-wal").exists())
+    self.assertTrue(Path(str(history_file) + "-shm").exists())
+
+  def test_concurrent_live_writers_insert_and_prune_without_losing_retained_entries(self) -> None:
+    history_file = self.root / "concurrent-retention.sqlite3"
+    arguments = ["--history-file", str(history_file), "--history-limit", "7"]
+    first = self.start(arguments, database="target_one")
+    second = self.start(arguments, database="target_two")
+    first.read_until(b"csql-with-history>")
+    second.read_until(b"csql-with-history>")
+
+    first_commands = ["select first_{};".format(number) for number in range(6)]
+    second_commands = ["select second_{};".format(number) for number in range(6)]
+
+    def submit_all(session: TerminalSession, commands: list[str]) -> None:
+      for command in commands:
+        session.send(command.encode("ascii") + b"\r")
+        session.read_until(('EXECUTED=["{}"]'.format(command)).encode("ascii"))
+        session.read_until(b"csql-with-history>")
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+      futures = (
+        executor.submit(submit_all, first, first_commands),
+        executor.submit(submit_all, second, second_commands),
+      )
+      for future in futures:
+        future.result()
+
+    retained = self.stored_commands(history_file)
+    self.assertEqual(7, len(retained))
+    self.assertEqual(7, len(set(retained)))
+    self.assertTrue(set(retained).issubset(set(first_commands + second_commands)))
+
+    reader = self.start(["--history-file", str(history_file), "--no-history"])
+    reader.read_until(b"csql-with-history>")
+    for command in reversed(retained):
+      reader.send(b"\x1b[A")
+      reader.read_for(0.03)
+      self.assertIn(command, self.rendered_screen(reader))
+
+  def test_conflicting_live_limits_apply_the_limit_of_each_committing_writer(self) -> None:
+    history_file = self.root / "conflicting-limits.sqlite3"
+    common = ["--history-file", str(history_file)]
+    wider = self.start([*common, "--history-limit", "5"], database="wide_target")
+    narrower = self.start([*common, "--history-limit", "3"], database="narrow_target")
+    wider.read_until(b"csql-with-history>")
+    narrower.read_until(b"csql-with-history>")
+
+    for number in range(5):
+      command = "select wide_{};".format(number)
+      wider.send(command.encode("ascii") + b"\r")
+      wider.read_until(('EXECUTED=["{}"]'.format(command)).encode("ascii"))
+      wider.read_until(b"csql-with-history>")
+
+    narrower.send(b"select narrow_commit;\r")
+    narrower.read_until(b'EXECUTED=["select narrow_commit;"]')
+    narrower.read_until(b"csql-with-history>")
+    self.assertEqual(
+      ["select wide_3;", "select wide_4;", "select narrow_commit;"],
+      self.stored_commands(history_file),
+    )
+
+    wider.send(b"select wide_after_prune;\r")
+    wider.read_until(b'EXECUTED=["select wide_after_prune;"]')
+    wider.read_until(b"csql-with-history>")
+    self.assertEqual(
+      [
+        "select wide_3;",
+        "select wide_4;",
+        "select narrow_commit;",
+        "select wide_after_prune;",
+      ],
+      self.stored_commands(history_file),
+    )
+
+  def test_short_writer_contention_waits_then_commits_before_csql_submission(self) -> None:
+    history_file = self.root / "brief-contention.sqlite3"
+    session = self.start(["--history-file", str(history_file)])
+    session.read_until(b"csql-with-history>")
+    lock_acquired = threading.Event()
+
+    def hold_writer_lock() -> None:
+      with closing(sqlite3.connect(history_file)) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        lock_acquired.set()
+        time.sleep(0.1)
+        connection.rollback()
+
+    holder = threading.Thread(target=hold_writer_lock)
+    holder.start()
+    self.assertTrue(lock_acquired.wait(1))
+    started = time.monotonic()
+    session.send(b"select after_brief_lock;\r")
+    session.read_until(b'EXECUTED=["select after_brief_lock;"]')
+    elapsed = time.monotonic() - started
+    holder.join(1)
+
+    self.assertFalse(holder.is_alive())
+    self.assertGreaterEqual(elapsed, 0.05)
+    self.assertLess(elapsed, 1.0)
+    self.assertEqual(["select after_brief_lock;"], self.stored_commands(history_file))
+
+  def test_expired_writer_contention_switches_to_memory_only_and_executes_submission(self) -> None:
+    history_file = self.root / "expired-contention.sqlite3"
+    session = self.start(["--history-file", str(history_file)])
+    session.read_until(b"csql-with-history>")
+    session.send(b"select persisted_before_lock;\r")
+    session.read_until(b'EXECUTED=["select persisted_before_lock;"]')
+    session.read_until(b"csql-with-history>")
+
+    with closing(sqlite3.connect(history_file)) as blocker:
+      blocker.execute("BEGIN IMMEDIATE")
+      started = time.monotonic()
+      session.send(b"select blocked_history;\r")
+      session.read_until(b"newly retained entries will disappear on exit", timeout=2)
+      session.read_until(b'EXECUTED=["select blocked_history;"]')
+      elapsed = time.monotonic() - started
+      session.read_until(b"csql-with-history>")
+
+    self.assertGreaterEqual(elapsed, 0.2)
+    self.assertLess(elapsed, 1.5)
+    session.send(b"SELECT volatile\x0aFROM memory;\r")
+    session.read_until(b'EXECUTED=["SELECT volatile", "FROM memory;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"SELECT volatile\x0aFROM memory;\r")
+    session.read_until(b'EXECUTED=["SELECT volatile", "FROM memory;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b" select private_after_failure;\r")
+    session.read_until(b'EXECUTED=[" select private_after_failure;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"select after_storage_restored;\r")
+    session.read_until(b'EXECUTED=["select after_storage_restored;"]')
+    session.read_until(b"csql-with-history>")
+
+    screen = self.rendered_screen(session)
+    self.assertEqual(1, screen.count("MEMORY-ONLY"), screen)
+    self.assertIn("entries disappear on exit", screen)
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select after_storage_restored;", self.rendered_screen(session))
+    session.send(b"\x03draft\x12volatile memory")
+    session.read_for(0.05)
+    search_screen = self.rendered_screen(session)
+    overlay = search_screen.split("History search:", 1)[1].split("MEMORY-ONLY", 1)[0]
+    self.assertEqual(1, overlay.count("SELECT volatile"), search_screen)
+    self.assertIn("FROM memory;", overlay)
+    session.send(b"\r")
+    session.read_for(0.05)
+    recalled = self.rendered_screen(session)
+    self.assertIn("SELECT volatile", recalled)
+    self.assertIn("FROM memory;", recalled)
+    session.send(b"\x03\x12private_after_failure")
+    session.read_for(0.05)
+    self.assertIn("(no matches)", self.rendered_screen(session))
+    session.send(b"\x1b")
+    session.read_for(0.1)
+    session.send(b"\x04")
+    self.assertEqual(0, session.wait())
+
+    self.assertEqual(["select persisted_before_lock;"], self.stored_commands(history_file))
+
+    restarted = self.start(["--history-file", str(history_file)])
+    restarted.read_until(b"csql-with-history>")
+    restarted.send(b"\x1b[A")
+    restarted.read_for(0.05)
+    restart_screen = self.rendered_screen(restarted)
+    self.assertIn("select persisted_before_lock;", restart_screen)
+    self.assertNotIn("blocked_history", restart_screen)
+    self.assertNotIn("after_storage_restored", restart_screen)
+    restarted.send(b"\x03\x12volatile memory")
+    restarted.read_for(0.05)
+    self.assertIn("(no matches)", self.rendered_screen(restarted))
+
+  def test_unavailable_history_destination_keeps_enhanced_memory_only_session_usable(self) -> None:
+    history_file = self.root / "missing" / "unavailable.sqlite3"
+    session = self.start(["--history-file", str(history_file)])
+
+    warning = session.read_until(b"newly retained entries will disappear on exit")
+    self.assertIn(b"persistent history unavailable", warning)
+    session.read_until(b"csql-with-history>")
+    self.assertIn("MEMORY-ONLY", self.rendered_screen(session))
+
+    session.send(b"select memory_only;\r")
+    session.read_until(b'EXECUTED=["select memory_only;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select memory_only;", self.rendered_screen(session))
+    self.assertFalse(history_file.exists())
+
+  def test_unavailable_no_history_store_keeps_saving_disabled(self) -> None:
+    history_file = self.root / "unreadable-history.sqlite3"
+    history_file.mkdir()
+    session = self.start(["--history-file", str(history_file), "--no-history"])
+
+    warning = session.read_until(b"history saving remains disabled")
+    self.assertIn(b"persistent history unavailable", warning)
+    session.read_until(b"csql-with-history>")
+    session.send(b"select private_no_history;\r")
+    session.read_until(b'EXECUTED=["select private_no_history;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x12private_no_history")
+    session.read_for(0.05)
+    self.assertIn("(no matches)", self.rendered_screen(session))
+    self.assertNotIn("MEMORY-ONLY", self.rendered_screen(session))
+
+  def test_ctrl_j_builds_one_multiline_submission_and_returns_to_styled_prompt(self) -> None:
+    session = self.start()
+
+    initial = session.read_until(b"csql-with-history>")
+    initial += session.read_for(0.05)
+    self.assertIn(b"\x1b[1;38;2;203;166;247m", initial)
+    self.assertIn(b"\x1b[38;2;205;214;244;48;2;24;24;37m", initial)
+    self.assertIn(b"\x1b[1;38;2;137;180;250;48;2;24;24;37m", initial)
+    self.assertIn(b"Ctrl+R", initial)
+    session.send(b"select\x0a42;\r")
+
+    result = session.read_until(b'EXECUTED=["select", "42;"]')
+    self.assertIn(b"select", result)
+    session.read_until(b"csql-with-history>")
+
+  def test_prompt_looking_output_and_silence_do_not_end_running_work(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"promptlike;\r")
+    session.read_until(b"promptlike;\r")
+    before_completion = session.read_for(0.2)
+    self.assertNotIn(b"csql-with-history>", before_completion)
+    self.assertNotIn(b"PROMPT-LIKE WORK FINISHED", before_completion)
+    self.assertIn(b"__CSQL_WITH_HISTORY_", before_completion)
+    completed = session.read_until(b"PROMPT-LIKE WORK FINISHED")
+    self.assertNotIn(b"csql-with-history>", completed)
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"quiet;\r")
+    session.read_until(b"quiet;\r")
+    silent_interval = session.read_for(0.2)
+    self.assertNotIn(b"csql-with-history>", silent_interval)
+    session.read_until(b"QUIET WORK FINISHED")
+    session.read_until(b"csql-with-history>")
+
+  def test_running_ctrl_c_matches_direct_csql_and_both_sessions_remain_usable(self) -> None:
+    direct = TerminalSession([str(self.csql), "synthetic_db"], self.root, self.environment)
+    self.addCleanup(direct.close)
+    wrapped = self.start()
+
+    for label, session, prompt in (
+      ("direct", direct, b"csql> "),
+      ("wrapped", wrapped, b"csql-with-history>"),
+    ):
+      with self.subTest(label=label):
+        session.read_until(prompt)
+        session.read_for(0.1)
+        session.send(b"slow;\r")
+        session.read_until(b"slow;\r\n")
+        interrupted_at = time.monotonic()
+        session.send(b"\x03")
+        session.read_until(b"ERROR: synthetic interrupted", timeout=2.0)
+        self.assertLess(time.monotonic() - interrupted_at, 1.0)
+        session.read_until(prompt)
+        session.read_for(0.1)
+        session.send(b"select after_interrupt;\r")
+        session.read_until(b'EXECUTED=["select after_interrupt;"]')
+        session.read_until(prompt)
+        session.read_for(0.1)
+        session.send(b";exit\r")
+        self.assertEqual(0, session.wait())
+
+  def test_shell_receives_terminal_input_and_returns_to_enhanced_history(self) -> None:
+    self.environment["CUBRID_CSQL_SHELL"] = "PS1='SYNTHETIC-SHELL> ' /bin/sh -i"
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+
+    session.send(b";shell\r")
+    session.read_until(b"SYNTHETIC-SHELL> ")
+    session.send(b"sleep 10\n")
+    session.read_for(0.1)
+    session.send(b"\x03")
+    session.read_until(b"SYNTHETIC-SHELL> ")
+    session.send(b"printf 'SHELL-INPUT-RECEIVED\\n'\nexit 7\n")
+    session.read_until(b"SHELL-INPUT-RECEIVED")
+    session.read_until(b"SHELL-STATUS=1792")
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"select after_shell;\r")
+    session.read_until(b'EXECUTED=["select after_shell;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x1b[A")
+    session.read_for(0.05)
+    self.assertIn("select after_shell;", self.rendered_screen(session))
+    self.assertEqual([";shell", "select after_shell;"], self.stored_commands())
+
+  def test_password_is_masked_and_excluded_from_history_and_search(self) -> None:
+    password = "synthetic-password-input-ticket07"
+    self.environment["SYNTHETIC_PASSWORD"] = password
+    session = self.start()
+
+    session.read_until(b"Password: ")
+    session.send(password.encode("ascii") + b"\n")
+    session.read_until(b"AUTHENTICATED")
+    session.read_until(b"csql-with-history>")
+    self.assertNotIn(password.encode("ascii"), bytes(session.output))
+
+    session.send(b"select after_password;\r")
+    session.read_until(b'EXECUTED=["select after_password;"]')
+    session.read_until(b"csql-with-history>")
+    session.send(b"\x12password-input-ticket07")
+    session.read_for(0.05)
+    self.assertIn("(no matches)", self.rendered_screen(session))
+    self.assertEqual(["select after_password;"], self.stored_commands())
+
+  def test_raw_terminal_program_prompt_output_does_not_reclaim_input_early(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+
+    session.send(b";rawhandoff\r")
+    session.read_until(b";rawhandoff\r\n")
+    output_before_completion = session.read_for(0.2)
+    self.assertNotIn(b"csql-with-history>", output_before_completion)
+    self.assertNotIn(b"RAW-HANDOFF-FINISHED", output_before_completion)
+    session.read_until(b"RAW-HANDOFF-FINISHED")
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"select after_raw_handoff;\r")
+    session.read_until(b'EXECUTED=["select after_raw_handoff;"]')
+
+  def test_resize_reaches_a_terminal_handoff_and_returns_at_the_current_size(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    session.send(b";rawhandoff\r")
+    session.read_until(b"__CSQL_WITH_HISTORY_")
+    session.set_size(13, 47)
+    session.read_until(b"RAW-HANDOFF-SIZE=13x47")
+    session.read_until(b"RAW-HANDOFF-FINISHED")
+    session.read_until(b"csql-with-history>")
+
+    handoff_returned = len(session.output)
+    session.send(b"select output_after_resized_handoff;\r")
+    session.read_until(b'EXECUTED=["select output_after_resized_handoff;"]')
+    session.read_until(b"csql-with-history>")
+    session.read_for(0.1)
+    screen = AnsiScreen(rows=13, columns=47)
+    screen.feed(bytes(session.output[handoff_returned:]))
+    lines = screen.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertIn("output_after_resized_handoff", "".join(lines))
+
+  def test_separate_submissions_accumulate_for_xrun_and_errors_do_not_end_session(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+
+    session.send(b";singleline off\r")
+    session.read_until(b"SINGLELINE IS OFF")
+    session.read_until(b"csql-with-history>")
+    for submission in (b"select\r", b"42;\r"):
+      session.send(submission)
+      session.read_until(submission)
+      session.read_until(b"csql-with-history>")
+    self.assertNotIn(b"EXECUTED", bytes(session.output))
+    session.send(b";xrun\r")
+    session.read_until(b'EXECUTED=["select", "42;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b";singleline on\r")
+    session.read_until(b"SINGLELINE IS ON")
+    session.read_until(b"csql-with-history>")
+    session.send(b"bad;\r")
+    session.read_until(b"ERROR: synthetic failure")
+    session.read_until(b"csql-with-history>")
+    session.send(b"select 99;\r")
+    session.read_until(b'EXECUTED=["select 99;"]')
+    session.read_until(b"csql-with-history>")
+
+  def test_alt_enter_cursor_editing_and_idle_ctrl_c_preserve_exact_drafts(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"selct\x1b[D\x1b[De\x1b[F 7;\r")
+    session.read_until(b'EXECUTED=["select 7;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"select\x1b\r84;\r")
+    session.read_until(b'EXECUTED=["select", "84;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"select\t21;\r")
+    session.read_until(b'EXECUTED=["select\\t21;"]')
+    session.read_until(b"csql-with-history>")
+
+    session.send(b"discard this draft\x03select 100;\r")
+    result = session.read_until(b'EXECUTED=["select 100;"]')
+    self.assertNotIn(b"discard this draft\r\n", result)
+    session.read_until(b"csql-with-history>")
+
+  def test_repeated_submissions_leave_one_rendered_prompt_and_status(self) -> None:
+    session = self.start()
+    session.set_size(10, 60)
+    session.read_until(b"csql-with-history>")
+    for number in range(15):
+      session.send("select {};\r".format(number).encode("ascii"))
+      session.read_until('EXECUTED=["select {};"]'.format(number).encode("ascii"))
+      session.read_until(b"csql-with-history>")
+    session.read_for(0.05)
+
+    screen = AnsiScreen(rows=10, columns=60)
+    screen.feed(bytes(session.output))
+    lines = screen.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+    self.assertTrue(any('EXECUTED=["select 14;"]' in line for line in lines), lines)
+
+  def test_soft_wrapped_draft_has_one_rendered_prompt_and_status(self) -> None:
+    session = self.start()
+    session.set_size(10, 20)
+    session.read_until(b"csql-with-history>")
+    session.send(b"x" * 45)
+    session.read_for(0.1)
+
+    screen = AnsiScreen(rows=10, columns=20)
+    screen.feed(bytes(session.output))
+    lines = screen.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+
+    session.send(b"\x03select 20;\r")
+    session.read_until(b'EXECUTED=["select 20;"]')
+
+  def test_resize_redraws_a_long_multibyte_draft_without_waiting_for_input(self) -> None:
+    session = self.start()
+    session.read_until(b"csql-with-history>")
+    draft = "select '" + "한글" * 30 + "';"
+    session.send(draft.encode("utf-8"))
+    session.read_for(0.1)
+    screen = AnsiScreen(rows=24, columns=100)
+    screen.feed(bytes(session.output))
+
+    session.set_size(9, 24)
+    resized = session.read_for(0.2)
+    screen.resize(9, 24)
+    screen.feed(resized)
+    self.assertIn(b"csql-with-history>", resized)
+    self.assertIn("한글".encode("utf-8"), resized)
+    self.assertIn(b"SQL  draft", resized)
+    lines = screen.display()
+    self.assertEqual(1, sum("csql-with-history>" in line for line in lines), lines)
+    self.assertEqual(1, sum("SQL  draft" in line for line in lines), lines)
+
+    session.send(b"\x03select after_resize;\r")
+    session.read_until(b'EXECUTED=["select after_resize;"]')
+
+  def test_exit_and_empty_draft_eof_restore_the_outer_terminal(self) -> None:
+    for ending in (b";exit\r", b"\x04"):
+      with self.subTest(ending=ending):
+        session = self.start()
+        session.read_until(b"csql-with-history>")
+        session.send(ending)
+        self.assertEqual(0, session.wait())
+        restored = session.terminal_attributes()
+        self.assertEqual(session.initial_attributes, restored)
+
+  def test_csql_error_exit_preserves_status_and_restores_the_outer_terminal(self) -> None:
+    self.environment["SYNTHETIC_STARTUP_STATUS"] = "23"
+    session = self.start()
+    self.assertEqual(23, session.wait())
+    self.assertEqual(session.initial_attributes, session.terminal_attributes())
+
+  def test_termination_signals_restore_the_terminal_and_reap_csql(self) -> None:
+    pid_file = self.root / "synthetic-csql.pid"
+    self.environment["SYNTHETIC_PID_FILE"] = str(pid_file)
+    for termination_signal in (signal.SIGHUP, signal.SIGTERM):
+      with self.subTest(signal=termination_signal):
+        pid_file.unlink(missing_ok=True)
+        session = self.start()
+        session.read_until(b"csql-with-history>")
+        csql_process_id = int(pid_file.read_text(encoding="ascii"))
+
+        os.kill(session.process_id, termination_signal)
+        self.assertEqual(128 + termination_signal, session.wait())
+        self.assertEqual(session.initial_attributes, session.terminal_attributes())
+
+        self.assertTrue(wait_for_process_exit(csql_process_id))
+
+  def test_termination_immediately_after_csql_spawn_still_reaps_the_child(self) -> None:
+    pid_file = self.root / "immediate-synthetic-csql.pid"
+    self.environment["SYNTHETIC_PID_FILE"] = str(pid_file)
+    session = self.start()
+    deadline = time.monotonic() + 2.0
+    while not pid_file.exists() and time.monotonic() < deadline:
+      time.sleep(0.001)
+    self.assertTrue(pid_file.exists())
+    csql_process_id = int(pid_file.read_text(encoding="ascii"))
+
+    os.kill(session.process_id, signal.SIGTERM)
+    self.assertEqual(128 + signal.SIGTERM, session.wait())
+    self.assertEqual(session.initial_attributes, session.terminal_attributes())
+    self.assertTrue(wait_for_process_exit(csql_process_id))
+
+
+if __name__ == "__main__":
+  unittest.main()
