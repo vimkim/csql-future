@@ -445,6 +445,60 @@ finally:
     session.read_until(b'EXECUTED=["SELECT 42;"]')
     self.assertEqual(["SELECT 42;"], self.stored_commands())
 
+  def test_show_syntax_completion_works_without_metadata_and_accepts_before_semicolon(self) -> None:
+    session = self.start(['-S'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'sho\t')
+    session.read_until(b'> SHOW  keyword')
+    session.send(b'\r ta;\x02\t')
+    session.read_until(b'> TABLES  keyword')
+    session.send(b'\r')
+    session.read_for(0.1)
+    self.assertEqual([], self.stored_commands())
+    self.assertNotIn(b'EXECUTED=', bytes(session.output))
+    self.assertIn('csql-with-history> SHOW TABLES;', self.rendered_screen(session))
+    session.send(b'\r')
+    session.read_until(b'EXECUTED=["SHOW TABLES;"]')
+    self.assertEqual(['SHOW TABLES;'], self.stored_commands())
+
+  def test_show_columns_completion_uses_both_connectors_and_cached_relations(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-C'])
+    session.read_until(b'csql-with-history>')
+    commands = []
+    for prefix, partial, connector in (('show columns ', b'f', 'FROM'),
+                                       ('show full columns ', b'i', 'IN')):
+      session.send(prefix.encode() + partial + b'\t')
+      session.read_until(('> ' + connector + '  keyword').encode())
+      session.send(b'\r co\t')
+      session.read_until(b'> code  table DBA')
+      session.send(b'\x0e\r')
+      session.read_for(0.1)
+      self.assertEqual(commands, self.stored_commands())
+      command = prefix + connector + ' coding;'
+      session.send(b';\r')
+      session.read_until(('EXECUTED=' + json.dumps([command])).encode())
+      session.read_until(b'csql-with-history>')
+      commands.append(command)
+    self.assertEqual(commands, self.stored_commands())
+    self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
+
+  def test_show_completion_cancel_preserves_draft_and_filters_do_not_offer_table_columns(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-S'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'show ta\t')
+    session.read_until(b'> TABLES  keyword')
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'bles;\r')
+    session.read_until(b'EXECUTED=["show tables;"]')
+    session.read_until(b'csql-with-history>')
+    session.send(b'show columns from code where na\t')
+    session.read_until(b'(no completions)')
+    self.assertNotIn('name  column', self.rendered_screen(session))
+    self.assertEqual(['show tables;'], self.stored_commands())
+
   def test_completion_help_preserves_selection_and_external_editor_remains_available(self) -> None:
     self.enable_catalog()
     self.configure_editor("print('COMPLETION-EDITOR-RETURN', flush=True)\npath.write_text('select edited;\\n')\n")

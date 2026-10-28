@@ -9,7 +9,7 @@ import re
 KEYWORDS = tuple("""
 ALTER AND AS ASC BY CALL CASE COMMIT CREATE DELETE DESC DISTINCT DROP ELSE END
 EXISTS FROM GROUP HAVING IN INSERT INTO IS JOIN LEFT LIMIT NOT NULL ON OR ORDER
-RIGHT ROLLBACK SELECT SET TABLE THEN UNION UPDATE VALUES VIEW WHEN WHERE
+RIGHT ROLLBACK SELECT SET SHOW TABLE THEN UNION UPDATE VALUES VIEW WHEN WHERE
 """.split())
 
 
@@ -80,6 +80,12 @@ class Relation:
 class Schema:
   user: str = ""
   relations: tuple[Relation, ...] = ()
+
+
+@dataclass(frozen=True)
+class ShowContext:
+  keywords: tuple[str, ...] = ()
+  relation: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,6 +211,27 @@ def table_position(tokens: list[Token]) -> bool:
   return False
 
 
+def show_context(tokens: list[Token]) -> ShowContext | None:
+  """Keep SHOW syntax and result fields separate from SELECT column context."""
+  if not tokens or tokens[0].keyword != 'SHOW':
+    return None
+  command = tokens[1:]
+  if not command:
+    return ShowContext(('COLUMNS', 'FULL', 'TABLES'))
+  if command[0].keyword == 'FULL':
+    command = command[1:]
+  if not command:
+    return ShowContext(('COLUMNS', 'TABLES'))
+  if command[0].keyword not in ('COLUMNS', 'TABLES'):
+    return None
+  if command[0].keyword == 'COLUMNS':
+    if len(command) == 1:
+      return ShowContext(('FROM', 'IN'))
+    if len(command) == 2 and command[1].keyword in ('FROM', 'IN'):
+      return ShowContext(relation=True)
+  return ShowContext()
+
+
 def referenced_relations(tokens: list[Token], schema: Schema) -> list[tuple[str, Relation]]:
   found = []
   for index, token in enumerate(tokens):
@@ -254,8 +281,10 @@ def suggest(text: str, cursor: int, schema: Schema = Schema(), message: str = ""
   if len(before) >= 2 and before[-1].text == '.':
     qualifier = before[-2].name
     before = before[:-2]
+  show = show_context(before)
+  relation_position = show.relation if show is not None else table_position(before)
   candidates = []
-  if table_position(before):
+  if relation_position:
     for relation in schema.relations:
       if not relation.name.casefold().startswith(prefix) or qualifier and relation.owner.casefold() != qualifier.casefold():
         continue
@@ -268,6 +297,9 @@ def suggest(text: str, cursor: int, schema: Schema = Schema(), message: str = ""
         rendered = identifier(relation.owner) + '.' + rendered
       kind = "view" if relation.kind == "VCLASS" else "table"
       candidates.append(Candidate(rendered, kind + " " + relation.owner))
+  elif show is not None:
+    if not qualifier and not quote:
+      candidates.extend(Candidate(word) for word in show.keywords if word.casefold().startswith(prefix))
   else:
     references = referenced_relations(scoped, schema)
     for alias, relation in references:

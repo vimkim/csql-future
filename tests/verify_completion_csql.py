@@ -41,6 +41,38 @@ def check_completion(mode: str, database: str, environment: dict[str, str], root
     session.close()
 
 
+def check_show_completion(mode: str, database: str, environment: dict[str, str], root: Path) -> None:
+  history = root / ('show-history-' + mode + '.sqlite3')
+  session = Session(['--history-file', str(history), mode, '-u', 'dba', '--no-pager', database], environment, root)
+  cases = (
+    (b'show ta;\x02\t', '> TABLES  keyword', 'show TABLES;'),
+    (b'show full ta;\x02\t', '> TABLES  keyword', 'show full TABLES;'),
+    (b'show columns from co;\x02\t', '> code  table DBA', 'show columns from code;'),
+    (b'show full columns in dba.[co];\x02\t', '> [code]  table DBA', 'show full columns in dba.[code];'),
+  )
+  commands = []
+  try:
+    session.expect('csql-with-history>')
+    for keys, menu, command in cases:
+      session.send(keys)
+      session.expect(menu)
+      session.send(b'\r')
+      session.read_for(0.1)
+      with closing(sqlite3.connect(history)) as connection:
+        assert connection.execute('SELECT count(*) FROM submissions').fetchone()[0] == len(commands)
+      session.send(b'\r')
+      session.expect('2 rows selected')
+      session.expect('csql-with-history>')
+      commands.append(command)
+    assert session.finish() == 0
+    with closing(sqlite3.connect(history)) as connection:
+      actual = [row[0] for row in connection.execute('SELECT command FROM submissions ORDER BY id')]
+    assert actual == commands + [';exit'], actual
+    print('PASS real {} SHOW completion, quoted targets, semicolons and history boundaries'.format(mode), flush=True)
+  finally:
+    session.close()
+
+
 def main() -> None:
   cubrid = require_program('cubrid')
   csql = require_program('csql')
@@ -71,6 +103,7 @@ def main() -> None:
     schema = parse_catalog(result.stdout)
     assert {'code', 'coding'} <= {r.name for r in schema.relations}, result.stdout
     check_completion('-S', database, environment, run)
+    check_show_completion('-S', database, environment, run)
     restricted = subprocess.run([csql, '-S', '-u', 'cwh_reader', '-p', 'test-only-password',
                                  '-r', '-t', '-c', CATALOG_QUERY, database],
                                 env=environment, cwd=run, capture_output=True, timeout=10, check=True)
@@ -80,6 +113,7 @@ def main() -> None:
     server_command(cubrid, 'start', database, environment, run)
     try:
       check_completion('-C', database, environment, run)
+      check_show_completion('-C', database, environment, run)
       check_refresh(database, environment, run)
     finally:
       server_command(cubrid, 'stop', database, environment, run)

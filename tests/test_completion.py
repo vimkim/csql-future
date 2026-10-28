@@ -15,9 +15,76 @@ SCHEMA = Schema('DBA', (
 
 class CompletionTest(unittest.TestCase):
 
-  def candidates(self, draft: str) -> list[str]:
+  def candidates(self, draft: str, schema: Schema = SCHEMA) -> list[str]:
     cursor = draft.index('|') if '|' in draft else len(draft)
-    return [c.text for c in suggest(draft.replace('|', ''), cursor, SCHEMA).candidates]
+    return [c.text for c in suggest(draft.replace('|', ''), cursor, schema).candidates]
+
+  def test_show_keywords_are_contextual_with_or_without_metadata(self) -> None:
+    cases = (
+      ('sho', ['SHOW']),
+      ('SHOW ', ['COLUMNS', 'FULL', 'TABLES']),
+      ('sHoW tA', ['TABLES']),
+      ('show c', ['COLUMNS']),
+      ('show f', ['FULL']),
+      ('show FULL ', ['COLUMNS', 'TABLES']),
+      ('show full c', ['COLUMNS']),
+      ('show columns ', ['FROM', 'IN']),
+      ('show full columns f', ['FROM']),
+      ('show columns i', ['IN']),
+      ('/* lead */ show /* gap */ full\ncolumns ', ['FROM', 'IN']),
+      ('select * from code; show ta', ['TABLES']),
+      ('show ta|; select * from code', ['TABLES']),
+    )
+    for schema in (Schema(), SCHEMA):
+      for draft, expected in cases:
+        with self.subTest(draft=draft, empty=not schema.relations):
+          self.assertEqual(expected, self.candidates(draft, schema))
+
+  def test_show_relation_targets_reuse_table_completion(self) -> None:
+    expected = self.candidates('select * from co')
+    for prefix in ('show columns from ', 'show columns in ',
+                   'show full columns from ', 'sHoW FuLl CoLuMnS iN '):
+      with self.subTest(prefix=prefix):
+        self.assertEqual(expected, self.candidates(prefix + 'co'))
+        self.assertEqual([], self.candidates(prefix + 'co', Schema()))
+        self.assertEqual(['code'], self.candidates(prefix + 'other.co'))
+        self.assertEqual(['code'], self.candidates(prefix + '[OTHER].co'))
+        for quote in ('[', '"', '`'):
+          self.assertEqual(self.candidates('select * from ' + quote + 'co'),
+                           self.candidates(prefix + quote + 'co'))
+    self.assertEqual(expected, self.candidates('show columns /* gap */ in -- owner\nco'))
+
+  def test_show_acceptance_replaces_the_token_and_preserves_the_suffix(self) -> None:
+    cases = (
+      ('show ta|wrong;', 'TABLES', 'show TABLES;'),
+      ('show full co|wrong from code;', 'COLUMNS', 'show full COLUMNS from code;'),
+      ('show columns i|wrong code;', 'IN', 'show columns IN code;'),
+      ('show columns in other.co|wrong;', 'code', 'show columns in other.code;'),
+      ('show columns from [co|wrong];', '[code]', 'show columns from [code];'),
+    )
+    for marked, candidate, expected in cases:
+      with self.subTest(draft=marked):
+        draft, cursor = marked.replace('|', ''), marked.index('|')
+        suggestions = suggest(draft, cursor, SCHEMA)
+        menu = CompletionMenu()
+        menu.open(draft, cursor, suggestions)
+        menu.selected = next(i for i, c in enumerate(suggestions.candidates) if c.text == candidate)
+        text, position = menu.accept()
+        self.assertEqual(expected, text)
+        self.assertEqual(suggestions.start + len(candidate), position)
+
+  def test_show_tails_do_not_inherit_underlying_columns_or_generic_sql(self) -> None:
+    for draft in ('show tables ', 'show full tables ', 'show tables where na',
+                  'show columns from code ', 'show columns in code where na',
+                  'show full columns from code where code.na',
+                  'show columns from code where x in co',
+                  'show columns bogus co', 'show columns from code, co',
+                  'show "ta', 'show other.ta'):
+      with self.subTest(draft=draft):
+        self.assertEqual([], self.candidates(draft))
+    self.assertEqual(['COMMIT'], self.candidates('select * from code where id in co'))
+    self.assertEqual(['name'], self.candidates('show tables; select na| from code'))
+    self.assertEqual(self.candidates('select * from co'), self.candidates('show index from co'))
 
   def test_relations_follow_sql_table_positions(self) -> None:
     for draft in ('select * from co', 'select * from code join co', 'update co',
@@ -62,7 +129,8 @@ class CompletionTest(unittest.TestCase):
 
   def test_comments_strings_and_session_commands_suppress_completion(self) -> None:
     for draft in ("select 'co", "select 'co|ding' from code", '-- co',
-                  'select /* co', 'select -- co\n|', ';schema co'):
+                  'select /* co', 'select -- co\n|', ';schema co',
+                  'show /* ta', 'show -- ta', "show tables like 'co"):
       with self.subTest(draft=draft):
         text = draft.replace('|', '')
         cursor = draft.index('|') if '|' in draft else len(text)

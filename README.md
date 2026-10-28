@@ -289,6 +289,15 @@ and comma-separated tables. It respects owner-qualified and quoted identifiers.
 Names that require quoting receive brackets. SQL keywords are also available.
 Reserved-word quoting uses a CUBRID 11.5 keyword snapshot.
 
+`SHOW` completion follows the command syntax. `SHOW ` offers `COLUMNS`, `FULL`,
+and `TABLES`; `SHOW TA` offers `TABLES`. After `SHOW [FULL] COLUMNS `, Tab offers
+`FROM` and `IN`. Both connectors complete cached table/view names, including
+owner-qualified and quoted names, as in `SHOW COLUMNS IN other.[co`.
+These syntax keywords remain available when schema metadata is unavailable.
+This initial scope covers `SHOW [FULL] TABLES` and `SHOW [FULL] COLUMNS` through
+table selection. Other SHOW families and SHOW `LIKE`/`WHERE` filter completion
+are outside this scope. SHOW filters do not suggest the target table's columns.
+
 Column completion resolves simple table aliases. For example, `c.na` in
 `select * from code c where c.na` can complete to `c.name`. A table later in
 the same draft can supply columns for an unfinished `SELECT` list. With multiple
