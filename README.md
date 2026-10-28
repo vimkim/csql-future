@@ -40,12 +40,13 @@
 오타 보정이나 검색어 내부의 글자를 건너뛰는 매칭은 지원하지 않습니다.
 
 <p align="center">
-  <img src="assets/readme/history-demo.gif" width="100%" alt="실제 demodb 히스토리 시연: athlete 쿼리 두 개를 실행하고 Ctrl+R로 검색한 뒤 아래 방향키로 이전 쿼리를 골라 Enter로 불러오고 다시 Enter로 실행합니다">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="실제 demodb 히스토리 시연: 쿼리 두 개를 실행하고 Ctrl+R과 아래 방향키로 탐색한 뒤 name을 검색해 결과를 하나로 좁히고 Enter로 불러와 다시 Enter로 실행합니다">
 </p>
 
 영상은 `select name from athlete limit 3;`과 `select code from athlete limit 3;`을
-실행한 뒤 **Ctrl+R**로 `athlete`를 검색합니다. **아래 방향키**로 먼저 실행한 쿼리를
-고르고 **Enter**로 편집기에 불러온 다음, Enter를 다시 눌러 실행합니다.
+실행한 뒤 **Ctrl+R**과 **아래 방향키**로 히스토리를 탐색합니다.
+`name`을 검색하면 두 항목 중 일치하는 쿼리 하나만 남습니다.
+**Enter**로 편집기에 불러온 다음, Enter를 다시 눌러 실행합니다.
 [히스토리 GIF 재생성 방법](assets/readme/README.md#live-history-recording)을 참고하세요.
 
 - **재시작 후에도 유지:** 기본으로 최근 고유 명령 10,000개를 SQLite에 보관합니다.

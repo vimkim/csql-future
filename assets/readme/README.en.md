@@ -73,8 +73,9 @@ select name from athlete limit 3;
 select code from athlete limit 3;
 ```
 
-It presses Ctrl+R, types `athlete`, and uses Down to select the older `name`
-query. Enter recalls the query into the editor; the recording pauses before
+It presses Ctrl+R and uses Down to browse the two entries. Typing `name`
+visibly narrows the list to the one matching query. Enter recalls it into
+the editor; the recording pauses before
 pressing Enter again to execute it. `;exit` quits. All history comes from this
 session in a temporary directory, without reading personal history.
 
@@ -84,7 +85,8 @@ With the same prerequisites as the completion demo, regenerate from the root:
 python3 tools/record_history_demo.py
 ```
 
-The recorder verifies that both queries appear in history, recall does not
+The recorder verifies that both queries appear in history, the `name` search
+leaves only one query visible, recall does not
 execute SQL, and exactly three queries succeed. It writes only
 `history-demo.cast` and `history-demo.gif`, leaving the completion recording
 unchanged. Use `--output-dir /tmp/csql-history-demo` for a separate preview.

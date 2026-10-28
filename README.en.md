@@ -39,12 +39,13 @@ substring somewhere in the query**. It does not correct typos or skip characters
 within a term.
 
 <p align="center">
-  <img src="assets/readme/history-demo.gif" width="100%" alt="Real demodb history demo: run two athlete queries, press Ctrl+R, search for athlete, select the older name query with Down, recall with Enter, then press Enter again to run it">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="Real demodb history demo: run two athlete queries, browse them with Ctrl+R and Down, search for name to leave one matching query, recall with Enter, then press Enter again to run it">
 </p>
 
 The demo runs `select name from athlete limit 3;` and
-`select code from athlete limit 3;`, then presses **Ctrl+R** and searches for
-`athlete`. **Down** selects the older query; **Enter** recalls it into the editor.
+`select code from athlete limit 3;`, then presses **Ctrl+R** and browses with
+**Down**. Searching for `name` narrows the two entries to one matching query.
+**Enter** recalls it into the editor.
 A second Enter runs it. [Regenerate the history GIF](assets/readme/README.en.md#live-history-recording).
 
 - **Survives restarts:** SQLite retains the latest 10,000 unique commands by default.

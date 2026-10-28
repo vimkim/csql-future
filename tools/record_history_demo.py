@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 
 from record_readme_demo import ROOT, Recording
+from pty_test_support import AnsiScreen
 
 
 def main() -> None:
@@ -56,15 +57,20 @@ def main() -> None:
         session.expect("csql-future>")
         session.hold(1.8)
 
-      # Search both submissions, then move from the newest to the older match.
+      # Browse both submissions, then visibly filter two matches down to one.
       history_start = len(session.output)
       session.key(b"\x12", "History search mode", hold=2.0)
       for query in queries:
         if query.encode() not in session.output[history_start:]:
           raise RuntimeError("a submitted query is missing from history search")
-      session.type("athlete")
-      session.hold(1.8)
-      session.key(b"\x1b[B", "> " + queries[0], hold=2.2)
+      session.key(b"\x1b[B", "> " + queries[0], hold=1.6)
+      session.type("name")
+      session.hold(2.4)
+      filtered = AnsiScreen(rows=24, columns=88)
+      filtered.feed(bytes(session.output[history_start:]))
+      visible = "\n".join(filtered.display())
+      if "> " + queries[0] not in visible or queries[1] in visible:
+        raise RuntimeError("name search did not visibly narrow history to one query")
 
       # Enter recalls into the editor; a separate Enter executes the query.
       recall_start = len(session.output)
