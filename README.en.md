@@ -14,6 +14,19 @@ with the database, user, and connection options you normally use.
 [Usage guide](docs/usage.en.md) · [Documentation](docs/README.en.md) ·
 [Internal introduction and demo](docs/internal-introduction.en.md)
 
+## Watch a demodb session
+
+<p align="center">
+  <img src="assets/readme/demodb-demo.gif" width="100%" alt="Real demodb standalone session: complete SELECT, filter hints to PARALLEL, choose athlete from table names, move back to complete its columns, run the query, complete a session command, and quit">
+</p>
+
+Start with `s` + **Tab**, accept `SELECT`, then open hint completion with
+`/*+` + **Tab** and type `PARA` to select `PARALLEL`. After `FROM` + **Tab**,
+choose `athlete`, move back after the hint, and press **Tab** for its columns.
+The recording runs the query, completes `;plan detail`, and quits with `;exit`.
+This is the real editor and CUBRID sample database in standalone (`-S`) mode.
+[Recording source and regeneration](assets/readme/README.en.md#live-demodb-recording).
+
 ## Ctrl+R: find the query instead of writing it again
 
 Remember a table name and a condition? Press **Ctrl+R** and type those words.
@@ -76,7 +89,7 @@ Keep typing to filter the open list. Backspace broadens the matches again.
 Use Up/Down to choose a candidate and **Enter** to insert it. SQL is submitted
 after the list closes and you press Enter again. **Esc** keeps your current draft.
 
-*These captures use the actual editor with illustrative history and an
+*The static captures use the actual editor with illustrative history and an
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.en.md).*
 
 <a id="get-started"></a>

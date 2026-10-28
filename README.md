@@ -14,6 +14,21 @@
 [사용 가이드](docs/usage.md) · [문서 목차](docs/README.md) ·
 [CUBRID 구성원용 소개·시연](docs/internal-introduction.md)
 
+<a id="watch-a-demodb-session"></a>
+
+## 실제 demodb 세션을 확인하세요
+
+<p align="center">
+  <img src="assets/readme/demodb-demo.gif" width="100%" alt="실제 demodb 독립 모드 시연: SELECT 완성, PARALLEL 힌트 필터링, athlete 테이블과 컬럼 완성, 쿼리 실행, 세션 명령 완성 후 종료">
+</p>
+
+`s` 뒤에서 **Tab**으로 `SELECT`를 선택합니다. `/*+` 뒤에서 **Tab**으로 힌트 목록을
+열고 `PARA`를 입력해 `PARALLEL`을 고릅니다. `FROM` 뒤의 **Tab**으로 `athlete`를
+고른 다음 힌트 뒤 SELECT 목록으로 돌아가 **Tab**으로 해당 컬럼을 완성합니다.
+영상은 쿼리 실행, `;plan detail` 완성, `;exit` 종료까지 보여 줍니다.
+실제 편집기와 CUBRID 샘플 DB를 독립(`-S`) 모드로 실행한 녹화입니다.
+[녹화 원본과 재생성 방법](assets/readme/README.md#live-demodb-recording)을 참고하세요.
+
 ## Ctrl+R: 쿼리를 다시 쓰는 대신 찾아서 고치세요
 
 지난번에 쓴 테이블명이나 조건 몇 개만 기억나도 **Ctrl+R**로 찾을 수 있습니다.
@@ -76,7 +91,7 @@ select <cursor> from employees;
 위·아래 키로 후보를 고르고 **Enter**로 삽입합니다.
 목록이 닫힌 뒤 Enter를 다시 눌러야 SQL이 제출됩니다. **Esc**는 현재 초안을 유지합니다.
 
-*화면은 실제 편집기를 테스트용 히스토리와 `employees` 스키마로 실행해 캡처했습니다.
+*정적 화면은 실제 편집기를 테스트용 히스토리와 `employees` 스키마로 실행해 캡처했습니다.
 [캡처 재생성 방법](assets/readme/README.md)을 참고하세요.*
 
 <a id="get-started"></a>
