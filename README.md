@@ -94,6 +94,8 @@ In Input mode:
   Enter accepts it without executing SQL. Esc closes the list without changing
   the draft. Enter submits SQL after the completion list closes.
   Tab in indentation, strings, and comments inserts a literal tab.
+  F1 shows completion-specific help while the list is open. Ctrl+X Ctrl+E
+  closes completion and opens the unchanged draft in the external editor.
 - Enter submits the entire draft.
 - **Ctrl+X Ctrl+E** opens the current draft in an external terminal editor.
   Press Ctrl+X, then Ctrl+E. The wrapper uses `$VISUAL`, then `$EDITOR`, then

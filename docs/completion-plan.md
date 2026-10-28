@@ -21,8 +21,9 @@ the installed `csql`. No new Python runtime dependency is required.
 - [x] **6. Acceptance.** Verify navigation, replacement, terminal resizing,
   metadata failures, credentials, history boundaries, and real CUBRID behavior.
   Update the README and review the final diff.
-- [ ] **Integration.** After approval, rebase onto current `main`, run the
-  affected checks, merge, push `main`, and clean up the task worktree and branch.
+- [x] **Integration preparation.** Continued with user approval. Rebased onto
+  current `main` and preserved the newer help/editor and history-age features.
+  Work item 560 records the final merge, push, cleanup, and verification result.
 
 ## Behavior
 
@@ -42,26 +43,28 @@ Metadata failure leaves SQL editing and execution available.
 
 | Step | Commit | Result |
 | --- | --- | --- |
-| Plan | `c4708bc` | Created this checklist and work item 560 from `main` at `0e95b34`. |
-| 1 | `b1f8fea` | Added the menu, navigation, acceptance, cancellation, and terminal tests. |
-| 2 | `72386bb` | Added SQL context, quotes, owners, scopes, and full identifier replacement. |
-| 3 | `d94e05c` | Added background catalog loading, limits, cleanup, and connection routing. |
-| 4 | `3a6844a` | Added the sequential standalone snapshot and authentication fallback. |
-| 5 | `f315412` | Added cache verification, alias columns, refresh failure, and recovery. |
-| 6 | Final acceptance commit | Added real CUBRID acceptance, reserved-word quoting, and documentation. |
+| Plan | `2e247c9` | Created this checklist and work item 560 from `main` at `0e95b34`. |
+| 1 | `9737b1b` | Added the menu, navigation, acceptance, cancellation, and terminal tests. |
+| 2 | `0810c07` | Added SQL context, quotes, owners, scopes, and full identifier replacement. |
+| 3 | `bf79f13` | Added background catalog loading, limits, cleanup, and connection routing. |
+| 4 | `b3ee15e` | Added the sequential standalone snapshot and authentication fallback. |
+| 5 | `fcec592` | Added cache verification, alias columns, refresh failure, and recovery. |
+| 6 | `7dc9b79` | Added real CUBRID acceptance, reserved-word quoting, and documentation. |
 
 Final review added expression-parenthesis handling and preserved indentation on
 later draft lines. It also separated reserved-word quoting from keyword suggestions.
 The final acceptance commit contains those changes and the tests for them.
 
-The separate help/editor task advanced `main` to `77dd83b` during this work.
-Its changes remain untouched. The task branch still starts from `0e95b34`.
+Separate help/editor and history-age work advanced `main` to `428ec9f` during
+implementation. The user authorized continuation after acceptance. The rebase
+preserves both features. Completion now has its own F1 help. External draft
+editing remains available while the completion menu is open.
 
 ## Verification log
 
 | Check | Result |
 | --- | --- |
-| `just test` | Passed all 82 tests after the fixture correction below. |
+| `just test` | Passed 82 tests before rebase, 101 after rebase, and all 102 after integration adaptation. |
 | `uv run python tests/verify_completion_csql.py` | Passed against CUBRID 11.5.0. |
 | `uv run python tests/verify_real_csql.py` | Passed the native bypass comparison matrix. |
 | `uv build` | Built wheel and source distribution. |
@@ -94,9 +97,8 @@ publishes its PID file with an atomic rename. Its focused termination test passe
 
 ## Resume
 
-Read work item 560 and inspect the branch and worktree status.
-Finish acceptance if its checkbox remains open. Then request integration approval
-under the supplied AGENTS.md Git workflow. After approval, rebase onto current
-local `main`, preserve its help/editor changes, resolve conflicts, and repeat the
-affected checks. Merge, push `main`, and clean up this task worktree and branch.
-Record the final integration commit and verification in the tracker.
+Read work item 560 before resuming. Implementation and integration approval are
+complete. If the tracker remains open, inspect the branch and worktree status.
+Finish the approved fast-forward merge, `main` push, and task cleanup after checks.
+Preserve newer destination changes if `main` advances. Record final evidence in
+the tracker. If the tracker is done, do not repeat integration.

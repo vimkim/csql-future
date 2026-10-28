@@ -439,6 +439,7 @@ class DraftEditor:
     "Ctrl+R: Search query history (enters history search mode)",
     "Ctrl+Q: quit, discarding the draft",
     "Draft:",
+    "Tab: complete a keyword, table, or column",
     "Enter: submit draft",
     "Ctrl+Enter / Ctrl+J: insert newline",
     "Ctrl+X Ctrl+E: open draft in $VISUAL/$EDITOR",
@@ -462,6 +463,18 @@ class DraftEditor:
     "Ctrl+Q: quit, discarding the draft",
     "Help:",
     "?: shortcuts on an empty query; F1: anytime",
+  )
+  COMPLETION_SHORTCUTS = (
+    "Select and accept:",
+    "Ctrl+N / Down / Tab: select next candidate",
+    "Ctrl+P / Up: select previous candidate",
+    "Enter: accept without executing SQL",
+    "Esc: close completion, preserving the draft",
+    "Other actions:",
+    "Ctrl+R: close completion and search history",
+    "Ctrl+X Ctrl+E: close completion and edit the draft",
+    "Ctrl+Q: quit, discarding the draft",
+    "F1: completion shortcuts",
   )
   EDITING_SHORTCUTS = (
     "Ctrl+A / Ctrl+E: line start/end",
@@ -565,6 +578,11 @@ class DraftEditor:
               self.history_index = None
           elif event.action is EditorAction.CANCEL:
             self.completion.active = False
+          elif event.action is EditorAction.EXTERNAL_EDITOR:
+            self.completion.active = False
+            self._edit_external(previous)
+            self._render(force=True)
+            continue
           elif event.action is not EditorAction.REDRAW:
             self.completion.active = False
             # Editing keys apply to the unchanged draft after closing the menu.
@@ -915,7 +933,12 @@ class DraftEditor:
     self._draw(output, cursor_visual_row, cursor_column, columns, force)
 
   def _render_help(self, output: List[str], width: int, height: int) -> None:
-    shortcuts = self.SEARCH_SHORTCUTS if self.search.active else self.INPUT_SHORTCUTS
+    if self.completion.active:
+      shortcuts, mode, compact_title = self.COMPLETION_SHORTCUTS, "Completion mode", "Completion help"
+    elif self.search.active:
+      shortcuts, mode, compact_title = self.SEARCH_SHORTCUTS, "History search mode", "Search help"
+    else:
+      shortcuts, mode, compact_title = self.INPUT_SHORTCUTS, "Input mode", "Input help"
     shortcuts += ("Text editing:",) + self.EDITING_SHORTCUTS
     help_lines = []
     for shortcut in shortcuts:
@@ -931,13 +954,12 @@ class DraftEditor:
     self.help_page_rows = available
     self.help_max_scroll = max(0, len(help_lines) - available)
     self.help_scroll = min(self.help_scroll, self.help_max_scroll)
-    mode = "History search mode" if self.search.active else "Input mode"
     position = "{}-{}/{}".format(
       self.help_scroll + 1, min(len(help_lines), self.help_scroll + available), len(help_lines),
     )
     title = "Shortcuts: " + mode
     if len(title) + len(position) + 1 > width:
-      title = "Search help" if self.search.active else "Input help"
+      title = compact_title
     title = self._truncate(title, max(0, width - len(position) - 1))
     output.append(PROMPT_STYLE + title.ljust(max(0, width - len(position))) + position + RESET)
     output.extend(help_lines[self.help_scroll:self.help_scroll + available])
