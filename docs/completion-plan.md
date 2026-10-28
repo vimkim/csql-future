@@ -16,7 +16,7 @@ the installed `csql`. No new Python runtime dependency is required.
 - [x] **4. Standalone snapshot.** Fetch metadata before the standalone client
   starts. Close the metadata client before starting the interactive client.
   Do not capture password keystrokes or query a second client during standalone use.
-- [ ] **5. Cache and columns.** Cache metadata per session. Refresh client/server
+- [x] **5. Cache and columns.** Cache metadata per session. Refresh client/server
   metadata on expiry or request. Resolve simple aliases and column positions.
 - [ ] **6. Acceptance.** Verify navigation, replacement, terminal resizing,
   metadata failures, credentials, history boundaries, and real CUBRID behavior.
@@ -48,7 +48,8 @@ Metadata failure leaves SQL editing and execution available.
 - SQL context and full identifier replacement are complete.
 - Client/server catalog loading and process cleanup are complete.
 - Standalone snapshot ordering and authentication fallback are complete.
-- Next action: finish cache, column, failure, and credential verification.
+- Cache, alias/column completion, and failure recovery are complete.
+- Next action: finish full regression and real CUBRID acceptance.
 
 ## Verification log
 
@@ -72,3 +73,9 @@ cleanup on exit. All nine launch/bypass tests passed.
 Step 4: standalone PTY tests passed. They prove the snapshot process exits
 before input, live standalone refresh starts no client, and failed metadata
 authentication preserves csql-owned password input and excludes secrets from history.
+
+Step 5: cache reuse, forced refresh, retained names after refresh failure, and
+later recovery passed terminal tests. Four metadata tests passed for escaping,
+malformed output, owner identity, credentials, and connection-option routing.
+Both standalone tests now pass after correcting status clipping and test
+synchronization. A multiline completion/resize/history test also passed.

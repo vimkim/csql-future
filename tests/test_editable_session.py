@@ -63,9 +63,16 @@ if "-c" in sys.argv:
     with open(catalog_log, "a") as stream:
       stream.write(json.dumps({"pid": os.getpid(), "arguments": sys.argv[1:]}) + "\\n")
   time.sleep(float(os.environ.get("SYNTHETIC_CATALOG_DELAY", "0")))
-  if os.environ.get("SYNTHETIC_CATALOG_FAIL") or "SYNTHETIC_CATALOG" not in os.environ:
+  failure_file = os.environ.get("SYNTHETIC_CATALOG_FAIL_FILE")
+  if os.environ.get("SYNTHETIC_CATALOG_FAIL") or failure_file and os.path.exists(failure_file) or "SYNTHETIC_CATALOG" not in os.environ:
     sys.exit(1)
-  print(os.environ["SYNTHETIC_CATALOG"], flush=True)
+  catalog_file = os.environ.get("SYNTHETIC_CATALOG_FILE")
+  if catalog_file:
+    with open(catalog_file) as stream:
+      catalog = stream.read()
+  else:
+    catalog = os.environ["SYNTHETIC_CATALOG"]
+  print(catalog, flush=True)
   sys.exit(0)
 
 prompt = os.environ.get("CUBRID_CSQL_PROMPT", "csql") + "> "
@@ -514,6 +521,7 @@ finally:
     session.read_until(b'csql-with-history>')
     session.send(b';refresh-completions\r')
     session.read_until(b'csql-with-history>')
+    session.read_for(0.1)
     session.send(b'select * from co\t')
     session.read_until(b'restart to refresh schema')
     self.assertEqual(1, len((self.root / 'catalog.log').read_text().splitlines()))
@@ -531,6 +539,59 @@ finally:
     session.read_until(b'EXECUTED=["SELECT 42;"]')
     self.assertEqual(['SELECT 42;'], self.stored_commands())
     self.assertNotIn(b'test-only-password', bytes(session.output))
+
+  def test_refresh_failure_keeps_cached_names_and_a_later_refresh_recovers(self) -> None:
+    self.enable_catalog()
+    failure_file = self.root / 'fail-catalog'
+    catalog_file = self.root / 'catalog.tsv'
+    catalog_file.write_text(self.environment['SYNTHETIC_CATALOG'])
+    self.environment['SYNTHETIC_CATALOG_FAIL_FILE'] = str(failure_file)
+    self.environment['SYNTHETIC_CATALOG_FILE'] = str(catalog_file)
+    session = self.start(['-C'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select * from co\t')
+    session.read_until(b'> code  table DBA')
+    failure_file.touch()
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'\x03;refresh-completions\r')
+    session.read_for(0.15)
+    session.send(b'select * from co\t')
+    session.read_until(b'Schema refresh failed; using cached names')
+    self.assertIn('coding', self.rendered_screen(session))
+    failure_file.unlink()
+    catalog_file.write_text(self.environment['SYNTHETIC_CATALOG'].replace('coding', 'coder'))
+    session.send(b'\x1b')
+    session.read_for(0.1)
+    session.send(b'\x03;refresh-completions\r')
+    session.read_for(0.15)
+    session.send(b'select * from co\t')
+    session.read_until(b'coder  table DBA')
+    self.assertEqual([], self.stored_commands())
+
+  def test_completion_menu_resizes_and_keeps_multiline_draft_and_help_search_modes(self) -> None:
+    self.enable_catalog()
+    session = self.start(['-C'])
+    session.read_until(b'csql-with-history>')
+    session.send(b'select *\x0afrom co\t')
+    session.read_until(b'> code  table DBA')
+    position = len(session.output)
+    session.set_size(7, 38)
+    resized = session.read_for(0.15)
+    self.assertIn(b'Completion', resized)
+    session.send(b'\x0e\r;\r')
+    session.read_until(b'EXECUTED=["select *", "from coding;"]')
+    session.read_until(b'csql-with-history>')
+    session.read_for(0.05)
+    screen = AnsiScreen(rows=7, columns=38)
+    screen.feed(bytes(session.output[position:]))
+    self.assertEqual(1, sum('csql-with-history>' in line for line in screen.display()))
+    session.send(b'\x12coding')
+    session.read_until(b'History search:')
+    session.send(b'\r')
+    session.read_for(0.1)
+    session.send(b'\r')
+    session.read_until(b'EXECUTED=["select *", "from coding;"]')
 
   def test_unix_editing_keys_preserve_the_draft_around_the_cursor(self) -> None:
     cases = (

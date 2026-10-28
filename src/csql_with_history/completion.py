@@ -215,6 +215,9 @@ def suggest(text: str, cursor: int, schema: Schema = Schema(), message: str = ""
       if not relation.name.casefold().startswith(prefix) or qualifier and relation.owner.casefold() != qualifier.casefold():
         continue
       own = relation.owner.casefold() in (schema.user.casefold(), 'public')
+      if relation.owner.casefold() == 'public' and schema.user.casefold() != 'public':
+        own = not any(r.owner.casefold() == schema.user.casefold() and r.name.casefold() == relation.name.casefold()
+                      for r in schema.relations)
       rendered = identifier(relation.name, quote)
       if not qualifier and not own:
         rendered = identifier(relation.owner) + '.' + rendered

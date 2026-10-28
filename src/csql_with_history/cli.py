@@ -872,9 +872,10 @@ class DraftEditor:
           output.append(self._truncate(marker + candidate.text + "  " + candidate.detail, content_width))
       else:
         output.append(self._truncate("(no completions)", content_width))
-      status = " Completion | Ctrl+N/P select | Enter accepts | Esc cancels "
+      status = " Completion | "
       if suggestions.message:
-        status += "| " + suggestions.message
+        status += suggestions.message + " | "
+      status += "Ctrl+N/P select | Enter accepts | Esc cancels "
       output.append(STATUS_STYLE + self._truncate(status, content_width) + RESET)
     elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
@@ -1596,6 +1597,7 @@ Wrapper options:
   --history-file PATH   SQLite history file (default: ./.csql_history.sqlite3)
   --history-limit N     Retain the latest N submissions (default: 10000)
   --no-history          Recall existing history without saving new submissions
+  --no-completion       Disable schema lookups and keep literal Tab input
   --help               Show this help without requiring CUBRID
   --version            Show the installed wrapper version
   --                   Forward remaining arguments to csql unchanged
@@ -1603,8 +1605,9 @@ Wrapper options:
 Input mode: ?/F1 shortcuts, Ctrl+R history search, Ctrl+X Ctrl+E external editor.
 History search mode: Ctrl+N/P selects, Enter recalls for editing, Esc restores the draft.
 Editor selection: $VISUAL, then $EDITOR, then vi. Save and exit to return to the draft.
-Enter submits. ? opens help in an empty field; F1 opens it at any time.
+Enter submits after the completion menu closes. ? opens help in an empty field; F1 opens it at any time.
 Ctrl+Enter/Ctrl+J inserts a newline. Ctrl+Q quits from either mode or help.
+Completion mode: Tab opens, Ctrl+N/P selects, Enter accepts, Esc cancels.
 Other arguments pass through to csql. Run csql directly for its native usage.""")
     return 0
   if list(arguments) == ["--version"]:
