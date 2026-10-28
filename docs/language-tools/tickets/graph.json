@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "planningBaseline": "c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f",
+  "externalBlockers": {"E01": "Reconcile integrated completion behavior with concurrent work 568 before extraction."},
+  "tickets": [
+    {"id": "01", "file": "01-completion-core.md", "blockedBy": [], "externalBlockers": ["E01"], "status": "specified"},
+    {"id": "02", "file": "02-native-worker.md", "blockedBy": [], "externalBlockers": [], "status": "specified"},
+    {"id": "03", "file": "03-lint-cli.md", "blockedBy": ["02"], "externalBlockers": [], "status": "specified"},
+    {"id": "04", "file": "04-lsp-slice.md", "blockedBy": ["01", "03"], "externalBlockers": [], "status": "specified"},
+    {"id": "05", "file": "05-schema-snapshots.md", "blockedBy": ["04"], "externalBlockers": [], "status": "specified"},
+    {"id": "06", "file": "06-query-dml.md", "blockedBy": ["04"], "externalBlockers": [], "status": "specified"},
+    {"id": "07", "file": "07-schema-engineer.md", "blockedBy": ["04"], "externalBlockers": [], "status": "specified"},
+    {"id": "08", "file": "08-script-boundaries.md", "blockedBy": ["04"], "externalBlockers": [], "status": "specified"},
+    {"id": "09", "file": "09-neovim.md", "blockedBy": ["05", "08"], "externalBlockers": [], "status": "specified"},
+    {"id": "10", "file": "10-vscode.md", "blockedBy": ["05", "08"], "externalBlockers": [], "status": "specified"},
+    {"id": "11", "file": "11-delivery.md", "blockedBy": ["06", "07", "09", "10"], "externalBlockers": [], "status": "specified"}
+  ]
+}

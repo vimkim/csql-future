@@ -1,0 +1,15 @@
+{
+  "trace_command": "strace -f -e trace=network,execve,openat",
+  "trace_path": "/tmp/cubrid-language-probe-569.strace",
+  "network_syscalls": [],
+  "execve": [
+    "1180647 execve(\"/home/vimkim/.local/share/mise/installs/python/latest/bin/python\", [\"python\", \"-B\", \"docs/language-tools/experiments/\"..., \"--library\", \"/home/vimkim/gh/cb/develop/build\"..., \"--prefix\", \"/home/vimkim/.cub/install/develo\"..., \"--source-commit\", \"cc947788d3b7dc402f46192d0f3299dd\"...], 0x7ffea18ca918 /* 145 vars */) = 0"
+  ],
+  "write_opens": [
+    "1180647 openat(AT_FDCWD, \"/mnt/nvme/data-5/tmp/8v13yopp\", O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC, 0600) = 4",
+    "1180647 openat(AT_FDCWD, \"/mnt/nvme/data-5/tmp/cubrid-parse-only-fnl0qlb3/cubrid.conf\", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 4",
+    "1180647 openat(AT_FDCWD, \"/mnt/nvme/data-5/tmp/cubrid-parse-only-fnl0qlb3/probe.err\", O_RDWR) = -1 ENOENT (No such file or directory)",
+    "1180647 openat(AT_FDCWD, \"/mnt/nvme/data-5/tmp/cubrid-parse-only-fnl0qlb3/probe.err\", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 4"
+  ],
+  "scope": "Observed syscalls for these fixed fixtures only. Not a proof for all grammar actions."
+}

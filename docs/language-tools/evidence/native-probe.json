@@ -1,0 +1,97 @@
+{
+  "experiment": "native-parse-only",
+  "library": "/home/vimkim/gh/cb/develop/build_preset_debug_gcc/cs/libcubridcs.so.11.5",
+  "library_sha256": "56eb36e9a46e3b6f5258974b25085b81d1679430618041343e4d979704822b33",
+  "binary_version": "11.5.0.2704-cc94778",
+  "source_commit_claim_from_build": "cc947788d3b7dc402f46192d0f3299ddcc8563ba",
+  "qualification": "feasibility-only, not a release conformance claim",
+  "parse_entrypoint": "parser_parse_string_with_escapes(..., false)",
+  "initialization": {
+    "er_init": 0,
+    "lang_init": 0,
+    "lang_set_charset_lang": 0,
+    "msgcat_init": 0,
+    "sysprm_load_and_init": 0
+  },
+  "cases": [
+    {
+      "id": "cubrid-serial-valid",
+      "text": "CREATE SERIAL order_no START WITH 10 INCREMENT BY 2;",
+      "tree": true,
+      "errors": [],
+      "expected_accepted": true,
+      "observed_accepted": true
+    },
+    {
+      "id": "cubrid-serial-invalid",
+      "text": "CREATE SERIAL order_no START WITH ;",
+      "tree": false,
+      "errors": [
+        {
+          "statement": 0,
+          "line": 1,
+          "column": 35,
+          "message": "In line 1, column 35 before END OF STATEMENT\nSyntax error: unexpected ';', expecting UNSIGNED_INTEGER"
+        }
+      ],
+      "expected_accepted": false,
+      "observed_accepted": false
+    },
+    {
+      "id": "editor-incomplete",
+      "text": "SELECT e. FROM employees e;",
+      "tree": false,
+      "errors": [
+        {
+          "statement": 0,
+          "line": 1,
+          "column": 26,
+          "message": "before '  employees e;'\ninvalid relational operator"
+        }
+      ],
+      "expected_accepted": false,
+      "observed_accepted": false
+    },
+    {
+      "id": "catalog-independent",
+      "text": "SELECT missing_column FROM missing_table;",
+      "tree": true,
+      "errors": [],
+      "expected_accepted": true,
+      "observed_accepted": true
+    },
+    {
+      "id": "unicode-crlf",
+      "text": "-- 한글 😀\r\nSELECT '한글 😀';",
+      "tree": true,
+      "errors": [],
+      "expected_accepted": true,
+      "observed_accepted": true
+    },
+    {
+      "id": "multiple-statements",
+      "text": "SELECT 1; CREATE SERIAL order_no START WITH 10;",
+      "tree": true,
+      "errors": [],
+      "expected_accepted": true,
+      "observed_accepted": true
+    },
+    {
+      "id": "destructive-text-only",
+      "text": "DROP TABLE must_never_be_executed;",
+      "tree": true,
+      "errors": [],
+      "expected_accepted": true,
+      "observed_accepted": true
+    }
+  ],
+  "incomplete_completion": {
+    "text": "SELECT e. FROM employees e;",
+    "cursor": 9,
+    "candidates": [
+      "id",
+      "name"
+    ]
+  },
+  "expectations_met": true
+}
