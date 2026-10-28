@@ -36,8 +36,8 @@ Replace `mydb` with your database name. Use your existing CSQL options, includin
 `-S` for standalone or `-C` for client/server mode when needed.
 Submit one familiar query, then find it again with Ctrl+R.
 
-The plan is to extend this completion engine through **LSP, a VS Code extension,
-and Neovim support**. Offline syntax checks and **syntax highlighting** come next,
+The plan is to use the separate `cubrid-language-tools` shared engine to extend
+this experience through **LSP, a VS Code extension, and Neovim support**. Offline syntax checks and **syntax highlighting** come next,
 with **CUBRID SQL formatting and editor formatting integration** as later goals.
 These editor and language tools are roadmap items, separate from current installed features.
 

@@ -2,6 +2,8 @@
 
 **한국어** | [English](10-vscode.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 **구현 결과:** 로컬 VSIX를 설치해 Neovim과 공통 완성·진단을 공유하고 CUBRID 어휘 기반 구문 강조를 제공합니다.
 
 **선행 조건:** 05, 08.

@@ -2,6 +2,8 @@
 
 **한국어** | [English](feasibility.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 질문: SQL 스크립트를 실행하지 않고 CUBRID 파서가 정상·오류·미완성 본문을 구분할 수 있는가?
 
 결과: **식별된 Linux 11.5 개발 빌드에서 고정 예제 7개는 가능했습니다.**

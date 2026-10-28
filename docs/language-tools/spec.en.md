@@ -2,6 +2,8 @@
 
 [한국어](spec.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 Status: implementation proposal supported by a narrow feasibility experiment.
 The [contracts](contracts.en.md) define exact observable behavior.
 The [ticket graph](tickets/README.en.md) defines implementation scope and order.

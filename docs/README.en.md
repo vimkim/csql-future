@@ -20,7 +20,7 @@ Commands, options, diagnostic codes, and SQL examples remain consistent across l
 | Document | Contents |
 | --- | --- |
 | [Completion implementation history](completion-plan.en.md) | Initial Tab completion checklist and historical verification |
-| [Shared language-tool design](language-tools/README.en.md) | Specification, contracts, parser experiment, and implementation tickets |
+| [Initial language-tool planning archive](language-tools/README.en.md) | Specification, contracts, parser experiment, and implementation tickets |
 | [README visuals](../assets/readme/README.en.md) | Capture provenance and regeneration |
 
 Design and experiment records preserve their original status and qualification limits.

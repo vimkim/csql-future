@@ -2,6 +2,8 @@
 
 **한국어** | [English](05-schema-snapshots.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 **구현 결과:** 편집기가 CUBRID에 접속하지 않고 설정한 로컬 메타데이터 스냅샷으로 스키마 기반 완성을 제공합니다.
 
 **선행 조건:** 04.

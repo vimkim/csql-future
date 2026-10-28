@@ -72,8 +72,9 @@ select <cursor> from employees;
   <img src="assets/readme/completion.svg" width="100%" alt="컬럼 자동 완성: select e. from employees e에서 예시 테이블의 department, id, name을 제안합니다">
 </p>
 
+목록을 연 채 계속 입력하면 후보를 좁히고, Backspace로 다시 넓힐 수 있습니다.
 위·아래 키로 후보를 고르고 **Enter**로 삽입합니다.
-목록이 닫힌 뒤 Enter를 다시 눌러야 SQL이 제출됩니다. **Esc**는 기존 초안을 유지합니다.
+목록이 닫힌 뒤 Enter를 다시 눌러야 SQL이 제출됩니다. **Esc**는 현재 초안을 유지합니다.
 
 *화면은 실제 편집기를 테스트용 히스토리와 `employees` 스키마로 실행해 캡처했습니다.
 [캡처 재생성 방법](assets/readme/README.md)을 참고하세요.*
@@ -155,8 +156,8 @@ just sync
 
 ## 앞으로: 터미널에서 익힌 완성을 편집기까지
 
-현재 완성 엔진을 공통 언어 도구로 확장해, SQL을 작성하는 곳마다 같은 CUBRID 지원을
-제공하려고 합니다. 다음 항목은 **예정 기능**입니다.
+별도 프로젝트 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에서
+공통 언어 엔진을 개발하고, csql-future와 편집기가 이를 사용하도록 확장할 계획입니다. 다음 항목은 **예정 기능**입니다.
 
 | 단계 | 목표 |
 | --- | --- |
@@ -169,7 +170,7 @@ just sync
 첫 언어 도구 배포 계획은 CUBRID 11.5의 특정 빌드 검증부터 시작합니다.
 포매팅과 의미·스타일 린팅은 이후 확장 목표입니다.
 지금도 Ctrl+X Ctrl+E로 Neovim 등 외부 편집기를 열 수 있으며, LSP 연동은 별도 예정 기능입니다.
-[로드맵](docs/roadmap.md)과 [언어 도구 설계 문서](docs/language-tools/README.md)에서 범위를 확인하세요.
+[로드맵](docs/roadmap.md)과 [공통 엔진 프로젝트](https://github.com/vimkim/cubrid-language-tools)에서 범위를 확인하세요.
 
 ## 오늘 쓰는 쿼리 하나로 시작해 보세요
 

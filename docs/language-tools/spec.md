@@ -2,6 +2,8 @@
 
 **한국어** | [English](spec.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 상태: 제한된 실현 가능성 실험을 근거로 한 구현 제안입니다.
 [계약](contracts.md)은 관찰 가능한 정확한 동작을, [티켓 의존 관계](tickets/README.md)는 구현 범위·순서를 정의합니다.
 

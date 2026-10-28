@@ -2,6 +2,8 @@
 
 [한국어](contracts.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 These are implementation requirements.
 No entry point in this document is available at the planning baseline.
 See the [spec](spec.en.md) for scope and the [tickets](tickets/README.en.md) for delivery order.

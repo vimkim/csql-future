@@ -2,6 +2,8 @@
 
 [한국어](03-lint-cli.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** An AI agent can check serial/literal-query files or stdin offline and distinguish syntax, coverage, and tool outcomes.
 
 **Blocked by:** 02.

@@ -2,6 +2,8 @@
 
 **한국어** | [English](03-lint-cli.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 **구현 결과:** AI 에이전트가 serial·리터럴 쿼리 파일과 표준 입력을 오프라인으로 검사하고 문법·미지원·도구 결과를 구분합니다.
 
 **선행 조건:** 02.

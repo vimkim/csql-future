@@ -2,6 +2,8 @@
 
 **한국어** | [English](execution.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 이 규칙은 계획 세션에서 사용자가 제공한 AGENTS 지침을 보존합니다.
 티켓 할당 전에 읽습니다. CUBRID 작업 전 `/home/vimkim/my-cubrid/CUBRID.md`를 읽으며,
 개인 정책이 충돌하는 저장소 지침보다 우선합니다.

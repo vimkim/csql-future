@@ -2,6 +2,8 @@
 
 **한국어** | [English](contracts.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 이 문서는 구현 요구사항입니다. 계획 기준 시점에는 여기의 진입점을 사용할 수 없습니다.
 범위는 [명세](spec.md), 납품 순서는 [티켓](tickets/README.md)을 참고합니다.
 

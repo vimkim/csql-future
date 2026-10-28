@@ -2,6 +2,8 @@
 
 [한국어](execution.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 These rules preserve the user-provided AGENTS instructions from the planning session.
 Read them before dispatching any ticket.
 Read `/home/vimkim/my-cubrid/CUBRID.md` before CUBRID-specific work.

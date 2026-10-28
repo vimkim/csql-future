@@ -2,6 +2,8 @@
 
 [한국어](05-schema-snapshots.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** An editor session obtains schema-aware completion from a configured local metadata snapshot without connecting to CUBRID.
 
 **Blocked by:** 04.

@@ -2,6 +2,8 @@
 
 [한국어](08-script-boundaries.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** `.csql` scripts receive useful SQL diagnostics alongside a small checked session-command subset and explicit coverage gaps.
 
 **Blocked by:** 04.

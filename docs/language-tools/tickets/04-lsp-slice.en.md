@@ -2,6 +2,8 @@
 
 [한국어](04-lsp-slice.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** A protocol client receives shared completion and a CUBRID-specific serial diagnostic from one language server.
 
 **Blocked by:** 01, 03.

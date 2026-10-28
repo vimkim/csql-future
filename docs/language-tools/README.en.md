@@ -2,6 +2,8 @@
 
 [한국어](README.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 Status: planning deliverables, 2026-10-28. The editor tools and lint commands described here do not exist yet.
 
 Start with the [specification](spec.en.md), [contracts](contracts.en.md), and [ticket graph](tickets/README.en.md).

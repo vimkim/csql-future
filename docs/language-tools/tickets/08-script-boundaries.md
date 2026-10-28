@@ -2,6 +2,8 @@
 
 **한국어** | [English](08-script-boundaries.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 **구현 결과:** `.csql`에서 SQL 진단, 제한된 세션 명령 검사와 명시적인 지원 범위 부족을 함께 제공합니다.
 
 **선행 조건:** 04.

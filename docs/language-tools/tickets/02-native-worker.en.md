@@ -2,6 +2,8 @@
 
 [한국어](02-native-worker.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** A caller can initialize an exact release profile and parse fixed SQL through a separate process without a database.
 
 **Blocked by:** None.

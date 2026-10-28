@@ -3,7 +3,8 @@
 **한국어** | [English](roadmap.en.md)
 
 `csql-future`는 CSQL의 일상적인 입력·검색을 개선하는 터미널 도구에서 출발합니다.
-앞으로는 같은 CUBRID 완성 엔진을 여러 편집기에서 사용하는 공통 언어 도구로 확장할 계획입니다.
+공통 엔진의 아키텍처·구현은 별도 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에서 관리합니다.
+이 문서는 csql-future 사용자가 기대할 연동과 기능을 안내합니다.
 
 이 문서는 배포 기능과 개발 방향을 구분합니다. 설계 문서의 티켓과 명령은 구현 요구사항이며,
 그 자체로 설치 가능한 기능이나 전체 CUBRID 문법 지원을 뜻하지 않습니다.
@@ -52,4 +53,4 @@
 - **추가 환경:** 다른 CUBRID 빌드·버전과 운영체제는 환경별 검증 이후 확대합니다.
 
 배포 날짜를 확정한 약속은 아닙니다. 상세 인터페이스와 구현 순서는
-[공통 언어 도구 설계](language-tools/README.md)에 기록되어 있습니다.
+[공통 엔진 프로젝트](https://github.com/vimkim/cubrid-language-tools)에 기록되어 있습니다.

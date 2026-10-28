@@ -2,6 +2,8 @@
 
 **한국어** | [English](README.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 상태: 계획 기준 시점에 로컬 티켓 11개를 정의했으며 구현하지 않았습니다.
 외부 이슈는 생성하지 않았습니다.
 [명세](../spec.md), [계약](../contracts.md), [실행 규칙](../execution.md)을 모든 티켓에 적용합니다.

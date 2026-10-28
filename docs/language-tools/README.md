@@ -2,6 +2,8 @@
 
 **한국어** | [English](README.en.md) · [문서 목차](../README.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 상태: 2026-10-28에 작성한 계획 산출물입니다. 여기 설명하는 편집기 도구와 린트 명령은 계획 기준 시점에 구현되지 않았습니다.
 사용자에게 소개할 현재 기능과 확장 방향은 [로드맵](../roadmap.md)에서 확인하세요.
 

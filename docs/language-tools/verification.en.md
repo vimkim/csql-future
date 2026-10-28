@@ -2,6 +2,8 @@
 
 [한국어](verification.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 Baseline: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`.
 Date: 2026-10-28.
 Only planning documents, starter fixtures, and a feasibility script changed.

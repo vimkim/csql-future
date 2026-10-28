@@ -2,6 +2,8 @@
 
 **한국어** | [English](verification.en.md)
 
+> 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
+
 기준: `c292d00c3e69a7e8bda08bb03b7e3073c8fe1b1f`. 날짜: 2026-10-28.
 당시 변경은 계획 문서·시작 예제·실험 스크립트뿐이었습니다.
 운영 코드와 기존 테스트는 바꾸지 않았습니다.

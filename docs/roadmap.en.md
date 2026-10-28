@@ -3,7 +3,9 @@
 [한국어](roadmap.md) | **English**
 
 `csql-future` starts with better input and history search in the terminal.
-The direction is a shared CUBRID language engine that brings the same completion to multiple editors.
+Shared-engine architecture and implementation belong to the separate
+[cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project.
+This document describes planned features and integrations for csql-future users.
 
 This document separates available features from planned work. Design tickets
 and proposed commands are implementation requirements. They do not establish installation availability or complete CUBRID syntax support.
@@ -54,4 +56,4 @@ Do not present them as installed features of the current terminal package.
 - **Broader completion and validation:** consider CTE/derived results, PL/CSQL, semantic/style lint, and live editor catalogs.
 - **More environments:** qualify additional CUBRID builds, versions, and operating systems separately.
 
-These goals do not promise release dates. See the [language-tool design](language-tools/README.en.md) for interfaces and implementation order.
+These goals do not promise release dates. See the [shared engine project](https://github.com/vimkim/cubrid-language-tools) for interfaces and implementation order.

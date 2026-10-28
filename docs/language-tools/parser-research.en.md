@@ -2,6 +2,8 @@
 
 [한국어](parser-research.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 Research snapshot: 2026-10-28. This note supplies design evidence. It does not certify a parser distribution or all CUBRID syntax. The planning session's native feasibility results are recorded separately.
 
 Product decision after research: the user selected 11.5 first. The spec pins the observed `11.5.0.2704-cc94778` build for initial qualification. The 11.4 reference below remains comparison evidence, not the initial target.

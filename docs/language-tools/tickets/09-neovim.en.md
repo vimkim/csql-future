@@ -2,6 +2,8 @@
 
 [한국어](09-neovim.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** Neovim users get shared completion/diagnostics and basic CUBRID highlighting/indentation for selected files.
 
 **Blocked by:** 05, 08.

@@ -72,8 +72,9 @@ With the cursor in the SELECT list, Tab offers columns from `employees`.
   <img src="assets/readme/completion.svg" width="100%" alt="Column completion: select e. from employees e offers department, id, and name from the demo schema">
 </p>
 
+Keep typing to filter the open list. Backspace broadens the matches again.
 Use Up/Down to choose a candidate and **Enter** to insert it. SQL is submitted
-after the list closes and you press Enter again. **Esc** keeps the original draft.
+after the list closes and you press Enter again. **Esc** keeps your current draft.
 
 *These captures use the actual editor with illustrative history and an
 `employees` catalog from the test harness. [Regenerate the captures](assets/readme/README.en.md).*
@@ -153,7 +154,8 @@ Interactive support is Linux-first. See the [usage guide](docs/usage.en.md) for 
 
 ## Next: bring the same completion engine to editors
 
-The direction is a shared CUBRID language engine across the terminal and editors.
+The separate [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project
+is building the shared engine for future terminal and editor integration.
 The following features are **planned**.
 
 | Stage | Goal |
@@ -167,7 +169,7 @@ The following features are **planned**.
 The first language-tool delivery starts with qualification of one CUBRID 11.5 build.
 Formatting and semantic/style lint remain later goals. You can already use
 Ctrl+X Ctrl+E with Neovim or another external editor. LSP integration is a separate planned feature.
-See the [roadmap](docs/roadmap.en.md) and [language-tool design](docs/language-tools/README.en.md).
+See the [roadmap](docs/roadmap.en.md) and [shared engine project](https://github.com/vimkim/cubrid-language-tools).
 
 ## Try it with one query you use today
 

@@ -2,6 +2,8 @@
 
 [한국어](01-completion-core.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 **What to build:** A pure completion caller can obtain the terminal's current suggestions and replacement spans. The terminal consumes that same module.
 
 **Blocked by:** E01, reconciliation with concurrent completion work 568. No internal blockers.

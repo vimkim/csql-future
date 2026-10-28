@@ -2,6 +2,8 @@
 
 [한국어](README.md) | **English**
 
+> Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
+
 Status: eleven local tickets are specified. None is implemented.
 No external issues were created.
 The [spec](../spec.en.md), [contracts](../contracts.en.md), and [execution rules](../execution.en.md) apply to every ticket.
