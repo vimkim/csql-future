@@ -43,6 +43,7 @@ import uuid
 
 from .completion import CompletionMenu, suggest
 from .metadata import CatalogCache, Connection
+from .keymap import DEFAULT_BINDINGS, EditorAction, Keymap, KeymapError, load_keymap
 
 DEFAULT_HISTORY_LIMIT = 10_000
 DEFAULT_HISTORY_NAME = ".csql_history.sqlite3"
@@ -108,6 +109,7 @@ class WrapperOptions:
   history_limit: int
   no_history: bool
   completion: bool = True
+  keymap_file: Optional[Path] = None
 
 
 class OptionError(ValueError):
@@ -285,39 +287,6 @@ class SubmissionHistory:
       self.connection.close()
 
 
-class EditorAction(Enum):
-  INSERT = auto()
-  SUBMIT = auto()
-  EOF = auto()
-  QUIT = auto()
-  INTERRUPT = auto()
-  NEWLINE = auto()
-  BACKSPACE = auto()
-  DELETE = auto()
-  LEFT = auto()
-  RIGHT = auto()
-  UP = auto()
-  DOWN = auto()
-  PAGE_UP = auto()
-  PAGE_DOWN = auto()
-  HOME = auto()
-  END = auto()
-  KILL_WORD = auto()
-  KILL_START = auto()
-  KILL_END = auto()
-  YANK = auto()
-  TRANSPOSE = auto()
-  HISTORY_OLDER = auto()
-  HISTORY_NEWER = auto()
-  REDRAW = auto()
-  SEARCH = auto()
-  HELP = auto()
-  EXTERNAL_EDITOR = auto()
-  COMPLETE = auto()
-  CANCEL = auto()
-  IGNORE = auto()
-
-
 @dataclass(frozen=True)
 class KeyEvent:
   action: EditorAction
@@ -431,57 +400,57 @@ class DraftEditor:
 
   INPUT_SHORTCUTS = (
     "Essential:",
-    "Ctrl+R: Search query history (enters history search mode)",
-    "Ctrl+Q: quit, discarding the draft",
+    "{search}: Search query history (enters history search mode)",
+    "{quit}: quit, discarding the draft",
     "Draft:",
-    "Tab: complete SQL, session commands, or database names",
-    "Enter: submit draft",
-    "Ctrl+Enter / Ctrl+J: insert newline",
-    "Ctrl+X Ctrl+E: open draft in $VISUAL/$EDITOR",
-    "Ctrl+C: clear draft",
-    "Ctrl+D: quit when the draft is empty",
+    "{complete}: complete SQL, session commands, or database names",
+    "{submit}: submit draft",
+    "{newline}: insert newline",
+    "{external_editor}: open draft in $VISUAL/$EDITOR",
+    "{interrupt}: clear draft",
+    "{eof}: quit when the draft is empty",
     "History navigation:",
-    "Ctrl+P / Ctrl+N: older/newer history",
-    "Up/Down: draft lines, then history",
+    "{history_older} / {history_newer}: older/newer history",
+    "{up} / {down}: draft lines, then history",
     "Help:",
-    "?: shortcuts on an empty draft; F1: anytime",
+    "{help_empty}: shortcuts on an empty draft; {help}: anytime",
   )
   SEARCH_SHORTCUTS = (
     "Search and recall:",
     "Type: filter history (all terms, ignore case)",
-    "Enter: recall for editing, without executing",
-    "Ctrl+N / Down: select next result",
-    "Ctrl+P / Up: select previous result",
+    "{submit}: recall for editing, without executing",
+    "{history_newer} / {down}: select next result",
+    "{history_older} / {up}: select previous result",
     "Leave search:",
-    "Esc: return to Input mode, restoring the draft",
-    "Ctrl+C: return to Input mode, clearing the draft",
-    "Ctrl+Q: quit, discarding the draft",
+    "{cancel}: return to Input mode, restoring the draft",
+    "{interrupt}: return to Input mode, clearing the draft",
+    "{quit}: quit, discarding the draft",
     "Help:",
-    "?: shortcuts on an empty query; F1: anytime",
+    "{help_empty}: shortcuts on an empty query; {help}: anytime",
   )
   COMPLETION_SHORTCUTS = (
     "Type or delete text to filter candidates",
     "Select and accept:",
-    "Ctrl+N / Down / Tab: select next candidate",
-    "Ctrl+P / Up: select previous candidate",
-    "Enter: accept without executing SQL",
-    "Esc: close completion, preserving the draft",
+    "{history_newer} / {down} / {complete}: select next candidate",
+    "{history_older} / {up}: select previous candidate",
+    "{submit}: accept without executing SQL",
+    "{cancel}: close completion, preserving the draft",
     "Other actions:",
-    "Ctrl+R: close completion and search history",
-    "Ctrl+X Ctrl+E: close completion and edit the draft",
-    "Ctrl+Q: quit, discarding the draft",
-    "F1: completion shortcuts",
+    "{search}: close completion and search history",
+    "{external_editor}: close completion and edit the draft",
+    "{quit}: quit, discarding the draft",
+    "{help}: completion shortcuts",
   )
   EDITING_SHORTCUTS = (
-    "Ctrl+A / Ctrl+E: line start/end",
-    "Ctrl+B / Ctrl+F: character left/right",
-    "Backspace / Ctrl+H: delete left",
-    "Delete / Ctrl+D: delete at cursor",
-    "Ctrl+W: cut previous word",
-    "Ctrl+U / Ctrl+K: cut to line start/end",
-    "Ctrl+Y: restore last cut",
-    "Ctrl+T: swap adjacent characters",
-    "Ctrl+L: redraw",
+    "{home}: line start; {end}: line end",
+    "{left}: character left; {right}: character right",
+    "{backspace}: delete left",
+    "{delete} / {eof}: delete at cursor",
+    "{kill_word}: cut previous word",
+    "{kill_start}: cut to line start; {kill_end}: cut to line end",
+    "{yank}: restore last cut",
+    "{transpose}: swap adjacent characters",
+    "{redraw}: redraw",
   )
 
   def __init__(
@@ -489,10 +458,12 @@ class DraftEditor:
     history: SubmissionHistory,
     consume_resize: Callable[[], bool],
     catalog: Optional[CatalogCache] = None,
+    keymap: Optional[Keymap] = None,
   ) -> None:
     self.history = history
     self.consume_resize = consume_resize
     self.catalog = catalog
+    self.keymap = keymap if keymap is not None else Keymap()
     self.catalog_revision = -1
     self.draft = TextBuffer()
     self.rendered_rows = 0
@@ -510,7 +481,7 @@ class DraftEditor:
     self.help_scroll = 0
     self.help_page_rows = 1
     self.help_max_scroll = 0
-    self.editor_prefix = False
+    self.key_prefix: Tuple[bytes, ...] = ()
 
   def read(self) -> Optional[str]:
     previous = termios.tcgetattr(0)
@@ -526,7 +497,7 @@ class DraftEditor:
       self.completion = CompletionMenu()
       self.show_help = False
       self.help_scroll = 0
-      self.editor_prefix = False
+      self.key_prefix = ()
       self._render()
       while True:
         event = self._read_key()
@@ -535,7 +506,8 @@ class DraftEditor:
         if self.show_help:
           if event.action in (
             EditorAction.CANCEL, EditorAction.SUBMIT, EditorAction.INTERRUPT, EditorAction.HELP,
-          ) or event.text == "?":
+            EditorAction.HELP_EMPTY,
+          ):
             self.show_help = False
           elif event.action in (EditorAction.UP, EditorAction.HISTORY_OLDER):
             self.help_scroll = max(0, self.help_scroll - 1)
@@ -551,8 +523,7 @@ class DraftEditor:
             self.help_scroll = self.help_max_scroll
           self._render(force=event.action is EditorAction.REDRAW)
           continue
-        active_buffer = self.search.query if self.search.active else self.draft
-        if event.action is EditorAction.HELP or (event.text == "?" and not active_buffer.text):
+        if event.action in (EditorAction.HELP, EditorAction.HELP_EMPTY):
           self.show_help = True
           self.help_scroll = 0
           self._render()
@@ -745,44 +716,58 @@ class DraftEditor:
       ready, _, _ = select.select([0], [], [], 0.05)
       if ready:
         break
-    first = os.read(0, 1)
-    external_editor = self.editor_prefix and first == b"\x05"
-    self.editor_prefix = first == b"\x18"
-    if external_editor:
-      return KeyEvent(EditorAction.EXTERNAL_EDITOR)
-    action = {
-      b"\x01": EditorAction.HOME,
-      b"\x02": EditorAction.LEFT,
-      b"\x03": EditorAction.INTERRUPT,
-      b"\x04": EditorAction.EOF,
-      b"\x05": EditorAction.END,
-      b"\x06": EditorAction.RIGHT,
-      b"\x08": EditorAction.BACKSPACE,
-      b"\x0a": EditorAction.NEWLINE,
-      b"\x0b": EditorAction.KILL_END,
-      b"\x0c": EditorAction.REDRAW,
-      b"\x0d": EditorAction.SUBMIT,
-      b"\x0e": EditorAction.HISTORY_NEWER,
-      b"\x10": EditorAction.HISTORY_OLDER,
-      b"\x11": EditorAction.QUIT,
-      b"\x12": EditorAction.SEARCH,
-      b"\x14": EditorAction.TRANSPOSE,
-      b"\x15": EditorAction.KILL_START,
-      b"\x17": EditorAction.KILL_WORD,
-      b"\x19": EditorAction.YANK,
-      b"\x7f": EditorAction.BACKSPACE,
-    }.get(first)
+    stroke = self._read_stroke()
+    sequence = self.key_prefix + (stroke,)
+    if sequence not in self.keymap.actions and sequence not in self.keymap.prefixes:
+      sequence = (stroke,)
+    self.key_prefix = ()
+    if sequence in self.keymap.prefixes:
+      self.key_prefix = sequence
+      return KeyEvent(EditorAction.IGNORE)
+    action = self.keymap.actions.get(sequence)
+    if action is EditorAction.HELP_EMPTY:
+      active_buffer = self.search.query if self.search.active else self.draft
+      if not self.show_help and active_buffer.text:
+        return KeyEvent(EditorAction.INSERT, stroke.decode("utf-8"))
+    if action is EditorAction.COMPLETE and self.search.active:
+      return KeyEvent(EditorAction.INSERT, "\t")
     if action is not None:
       return KeyEvent(action)
-    if first == b"\x09":
-      if self.search.active:
-        return KeyEvent(EditorAction.INSERT, "\t")
-      return KeyEvent(EditorAction.COMPLETE)
-    if first == b"\x1b":
-      return self._read_escape()
-    if first < b"\x20":
-      return KeyEvent(EditorAction.IGNORE)
+    # Unbound printable keys remain available for SQL and search text.
+    data = stroke.removeprefix(b"\x1b")
+    if data and data >= b" " and not stroke.startswith((b"\x1b[", b"\x1bO")) and data != b"\x7f":
+      return KeyEvent(EditorAction.INSERT, data.decode("utf-8", errors="replace"))
+    return KeyEvent(EditorAction.IGNORE)
 
+  def _read_stroke(self) -> bytes:
+    first = os.read(0, 1)
+    if not first:
+      return first
+    if first == b"\x1b":
+      ready, _, _ = select.select([0], [], [], 0.05)
+      if not ready:
+        return first
+      second = os.read(0, 1)
+      if second == b"O":
+        ready, _, _ = select.select([0], [], [], 0.05)
+        return first + second + (os.read(0, 1) if ready else b"")
+      if second == b"[":
+        sequence = bytearray(first + second)
+        while len(sequence) < 34:
+          ready, _, _ = select.select([0], [], [], 0.01)
+          if not ready:
+            break
+          sequence.extend(os.read(0, 1))
+          if 0x40 <= sequence[-1] <= 0x7e:
+            break
+        return bytes(sequence)
+      return first + self._read_character(second)
+    return self._read_character(first)
+
+  @staticmethod
+  def _read_character(first: bytes) -> bytes:
+    if not first:
+      return first
     expected = 1
     value = first[0]
     if value & 0xE0 == 0xC0:
@@ -793,53 +778,11 @@ class DraftEditor:
       expected = 4
     data = bytearray(first)
     while len(data) < expected:
-      data.extend(os.read(0, expected - len(data)))
-    return KeyEvent(EditorAction.INSERT, data.decode("utf-8", errors="replace"))
-
-  def _read_escape(self) -> KeyEvent:
-    ready, _, _ = select.select([0], [], [], 0.05)
-    if not ready:
-      return KeyEvent(EditorAction.CANCEL)
-    second = os.read(0, 1)
-    if second in (b"\r", b"\n"):
-      return KeyEvent(EditorAction.NEWLINE)
-    if second == b"O":
-      ready, _, _ = select.select([0], [], [], 0.05)
-      if ready and os.read(0, 1) == b"P":
-        return KeyEvent(EditorAction.HELP)
-      return KeyEvent(EditorAction.IGNORE)
-    if second != b"[":
-      return KeyEvent(EditorAction.INSERT, second.decode("utf-8", errors="ignore"))
-
-    sequence = bytearray()
-    while len(sequence) < 32:
-      ready, _, _ = select.select([0], [], [], 0.01)
-      if not ready:
+      following = os.read(0, expected - len(data))
+      if not following:
         break
-      sequence.extend(os.read(0, 1))
-      # Every CSI sequence ends at a byte in this range, including CSI-u.
-      if 0x40 <= sequence[-1] <= 0x7e:
-        break
-    action = {
-      b"A": EditorAction.UP,
-      b"B": EditorAction.DOWN,
-      b"C": EditorAction.RIGHT,
-      b"D": EditorAction.LEFT,
-      b"H": EditorAction.HOME,
-      b"F": EditorAction.END,
-      b"1~": EditorAction.HOME,
-      b"3~": EditorAction.DELETE,
-      b"4~": EditorAction.END,
-      b"5~": EditorAction.PAGE_UP,
-      b"6~": EditorAction.PAGE_DOWN,
-      b"7~": EditorAction.HOME,
-      b"8~": EditorAction.END,
-      b"11~": EditorAction.HELP,
-      b"1;1P": EditorAction.HELP,
-      b"13;5u": EditorAction.NEWLINE,
-      b"27;5;13~": EditorAction.NEWLINE,
-    }.get(bytes(sequence), EditorAction.IGNORE)
-    return KeyEvent(action)
+      data.extend(following)
+    return bytes(data)
 
   def _render(self, force: bool = False) -> None:
     lines = self.draft.text.split("\n")
@@ -904,7 +847,10 @@ class DraftEditor:
       status = " Completion | "
       if suggestions.message:
         status += suggestions.message + " | "
-      status += "Ctrl+N/P select | Enter accepts | Esc cancels "
+      status += "{} / {} select | {} accepts | {} cancels ".format(
+        self.keymap.label("history_newer", first=True), self.keymap.label("history_older", first=True),
+        self.keymap.label("submit", first=True), self.keymap.label("cancel", first=True),
+      )
       output.append(STATUS_STYLE + self._truncate(status, content_width) + RESET)
     elif self.search.active:
       output.append(PROMPT_STYLE + "History search:" + RESET)
@@ -947,7 +893,9 @@ class DraftEditor:
       shortcuts, mode, compact_title = self.INPUT_SHORTCUTS, "Input mode", "Input help"
     shortcuts += ("Text editing:",) + self.EDITING_SHORTCUTS
     help_lines = []
+    labels = {action: self.keymap.label(action) for action in DEFAULT_BINDINGS}
     for shortcut in shortcuts:
+      shortcut = shortcut.format_map(labels)
       wrapped, _ = self._wrap_line(shortcut, width)
       for index, line in enumerate(wrapped):
         if shortcut.endswith(":"):
@@ -969,12 +917,16 @@ class DraftEditor:
     title = self._truncate(title, max(0, width - len(position) - 1))
     output.append(PROMPT_STYLE + title.ljust(max(0, width - len(position))) + position + RESET)
     output.extend(help_lines[self.help_scroll:self.help_scroll + available])
+    footer = " {} close | {} / {} scroll".format(
+      self.keymap.label("cancel", first=True), self.keymap.label("up", first=True),
+      self.keymap.label("down", first=True),
+    )
+    if width >= 50:
+      footer += " | {} / {} page".format(
+        self.keymap.label("page_up", first=True), self.keymap.label("page_down", first=True),
+      )
     if width >= 76:
-      footer = " ?/F1/Esc close | Up/Down scroll | PgUp/PgDn page | Home/End | Ctrl+Q quit "
-    elif width >= 50:
-      footer = " Esc close | Up/Down scroll | PgUp/PgDn | Ctrl+Q quit "
-    else:
-      footer = " Esc close | Up/Down scroll "
+      footer += " | {} quit".format(self.keymap.label("quit", first=True))
     output.append(STATUS_STYLE + self._truncate(footer, width).ljust(width) + RESET)
 
   def _draw(
@@ -1075,12 +1027,14 @@ class DraftEditor:
 
   def _search_status(self, width: int) -> List[str]:
     return self._status_lines("History search mode", (
-      ("Ctrl+Q", " quit"), ("Enter", " recall" if width >= 26 else ""),
-    ), width, hints=(("Esc", " back"),))
+      (self.keymap.label("quit", first=True), " quit"),
+      (self.keymap.label("submit", first=True), " recall" if width >= 26 else ""),
+    ), width, hints=((self.keymap.label("cancel", first=True), " back"),))
 
   def _status(self, line_count: int, width: int) -> List[str]:
     return self._status_lines("Input mode", (
-      ("Ctrl+R", " history"), ("Ctrl+Q", " quit"),
+      (self.keymap.label("search", first=True), " history"),
+      (self.keymap.label("quit", first=True), " quit"),
     ), width, " | {} lines".format(line_count))
 
   def _status_lines(
@@ -1088,13 +1042,15 @@ class DraftEditor:
     hints: Sequence[Tuple[str, str]] = (),
   ) -> List[str]:
     groups = [("", " " + mode if len(mode) < width else mode, True)]
-    groups.extend((key, label, True) for key, label in actions)
-    groups.extend((key, label, False) for key, label in (*hints, ("?", " shortcuts")))
+    groups.extend((key, label, True) for key, label in actions if key != "Unbound")
+    help_action = "help_empty" if self.keymap.bindings["help_empty"] else "help"
+    help_hint = (self.keymap.label(help_action, first=True), " shortcuts")
+    groups.extend((key, label, False) for key, label in (*hints, help_hint) if key != "Unbound")
     lines = []
     line = ""
     used = 0
     for key, label, required in groups:
-      length = len(key + label)
+      length = self._text_width(key + label)
       separator = " | " if used else ""
       if used and used + len(separator) + length > width:
         if not required:
@@ -1103,8 +1059,8 @@ class DraftEditor:
         line, used, separator = "", 0, ""
       if length > width:
         key = self._truncate(key, width)
-        label = self._truncate(label, width - len(key))
-        length = len(key + label)
+        label = self._truncate(label, width - self._text_width(key))
+        length = self._text_width(key + label)
       line += STATUS_STYLE + separator + STATUS_KEY_STYLE + key + STATUS_STYLE + label
       used += len(separator) + length
     if used + len(detail) <= width:
@@ -1427,6 +1383,7 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
   history_limit = DEFAULT_HISTORY_LIMIT
   no_history = False
   completion = True
+  keymap_file = None
   forwarded: List[str] = []
   index = 0
 
@@ -1443,6 +1400,17 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
     if argument == "--no-completion":
       completion = False
       index += 1
+      continue
+
+    if argument == "--keymap" or argument.startswith("--keymap="):
+      if argument == "--keymap":
+        value, index = _required_value(arguments, index, argument)
+      else:
+        value = argument.split("=", 1)[1]
+        index += 1
+      if not value:
+        raise OptionError("option --keymap requires a path")
+      keymap_file = (launch_directory / Path(value).expanduser()).resolve(strict=False)
       continue
 
     if argument == "--history-file":
@@ -1471,7 +1439,7 @@ def parse_options(arguments: Sequence[str], launch_directory: Path) -> Tuple[Wra
     else:
       index += 1
 
-  options = WrapperOptions(history_file.resolve(strict=False), history_limit, no_history, completion)
+  options = WrapperOptions(history_file.resolve(strict=False), history_limit, no_history, completion, keymap_file)
   return options, forwarded
 
 
@@ -1569,6 +1537,7 @@ def is_interactive(arguments: Sequence[str]) -> bool:
 
 
 def run_interactive(executable: str, arguments: Sequence[str], options: WrapperOptions) -> int:
+  keymap = load_keymap(options.keymap_file)
   previous_signal_mask = signal.pthread_sigmask(signal.SIG_BLOCK, TERMINATION_SIGNALS)
   terminal: Optional[CsqlTerminal] = None
   history: Optional[SubmissionHistory] = None
@@ -1587,7 +1556,7 @@ def run_interactive(executable: str, arguments: Sequence[str], options: WrapperO
       return terminal.returncode()
 
     history = SubmissionHistory(options.history_file, options.history_limit, options.no_history)
-    editor = DraftEditor(history, terminal.consume_resize, catalog)
+    editor = DraftEditor(history, terminal.consume_resize, catalog, keymap)
     while True:
       submission = editor.read()
       # A foreground editor receives SIGWINCH itself. Refresh csql's private
@@ -1631,10 +1600,13 @@ Wrapper options:
   --history-limit N     Retain the latest N unique commands (default: 10000)
   --no-history          Recall existing history without saving new submissions
   --no-completion       Disable schema lookups and keep literal Tab input
+  --keymap PATH         Load editor shortcut overrides from a JSON file
+  --print-keymap        Print default shortcuts as JSON without requiring CUBRID
   --help               Show this help without requiring CUBRID
   --version            Show the installed wrapper version
   --                   Forward remaining arguments to csql unchanged
 
+Default shortcuts (customize ~/.config/csql-future/keymap.json or $XDG_CONFIG_HOME/csql-future/keymap.json):
 Input mode: ?/F1 shortcuts, Ctrl+R history search, Ctrl+X Ctrl+E external editor.
 History search mode: Ctrl+N/P selects, Enter recalls for editing, Esc restores the draft.
 Editor selection: $VISUAL, then $EDITOR, then vi. Save and exit to return to the draft.
@@ -1642,6 +1614,10 @@ Enter submits after the completion menu closes. ? opens help in an empty field; 
 Ctrl+Enter/Ctrl+J inserts a newline. Ctrl+Q quits from either mode or help.
 Completion mode: Tab opens, Ctrl+N/P selects, Enter accepts, Esc cancels.
 Other arguments pass through to csql. Run csql directly for its native usage.""")
+    return 0
+  if list(arguments) == ["--print-keymap"]:
+    import json
+    print(json.dumps(DEFAULT_BINDINGS, indent=2))
     return 0
   if list(arguments) == ["--version"]:
     from importlib.metadata import version
@@ -1660,7 +1636,11 @@ Other arguments pass through to csql. Run csql directly for its native usage."""
     return 127
 
   if is_interactive(csql_arguments):
-    return run_interactive(executable, csql_arguments, options)
+    try:
+      return run_interactive(executable, csql_arguments, options)
+    except KeymapError as error:
+      print("csql-future: {}".format(error), file=sys.stderr)
+      return 2
 
   try:
     os.execv(executable, ["csql", *csql_arguments])

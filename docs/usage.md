@@ -35,7 +35,7 @@ csql-future -u dba mydb
 이 경로를 `PATH`에 추가하세요. 다른 디렉터리에서는
 `just --justfile /path/to/csql-future/justfile sync`로 설치할 수 있습니다.
 설치 후 소스 체크아웃을 옮기거나 제거해도 명령을 사용할 수 있습니다.
-`--help`와 `--version`은 CUBRID 없이 동작합니다. 나머지 인자는 `csql`로 전달합니다.
+`--help`, `--version`, `--print-keymap`은 CUBRID 없이 동작합니다. 나머지 인자는 `csql`로 전달합니다.
 CSQL 자체 사용법은 `csql`을 직접 실행해 확인하세요.
 
 개발 시에는 `uv sync`, `just test`, `uv run csql-future -u dba mydb`를 사용합니다.
@@ -63,11 +63,74 @@ CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 �
 | `--history-limit N` | 기본 10,000개. `N`은 정수 |
 | `--no-history` | 저장하지 않고 기존 선택 파일에서 읽기 전용으로 불러오기 |
 | `--no-completion` | 스키마 조회를 끄고 Tab을 문자 그대로 입력 |
+| `--keymap PATH` | 선택한 JSON 파일에서 단축키 변경 사항 읽기. 상대 경로는 실행 디렉터리 기준 |
+| `--print-keymap` | 모든 기본 동작과 키를 JSON으로 출력하고 종료 |
 
 파이프 입력과 CSQL의 `-i`/`--input-file`, `-c`/`--command`는 히스토리를 생성·변경하지 않고
 `csql`로 직접 전달합니다. 프로세스 교체로 표준 스트림, 리다이렉션, 시그널, 종료 상태를 유지합니다.
 값을 받는 CSQL 옵션을 인식하므로 SQL·비밀번호·파일명 등이 래퍼 옵션처럼 보여도 값으로 처리합니다.
 `--` 뒤에서는 래퍼 옵션 해석을 중지합니다.
+
+<a id="customize-shortcuts"></a>
+
+## 단축키 변경
+
+`~/.config/csql-future/keymap.json`을 만들어 편집기 단축키를 변경합니다.
+`XDG_CONFIG_HOME`이 설정되어 있으면
+`$XDG_CONFIG_HOME/csql-future/keymap.json`을 사용합니다.
+다음 예시는 히스토리 검색, 외부 편집기, 도움말 키를 바꾸고 문자 교환을 끕니다.
+
+```json
+{
+  "search": ["Alt+r"],
+  "external_editor": ["F4", "Ctrl+X Ctrl+V"],
+  "help": ["F2"],
+  "transpose": []
+}
+```
+
+변경 후 `csql-future`를 다시 실행합니다. 상태 표시줄과 도움말에도 변경한 키가 나옵니다.
+동작별 목록은 해당 동작의 기본 키 전체를 대체합니다. 생략한 동작은 기본값을 유지하고,
+빈 목록은 해당 동작을 끕니다. 파일을 삭제하면 기본값으로 돌아갑니다.
+`help_empty`는 빈 입력란에서 도움말을 여는 문자 하나를 지정합니다.
+기본값은 `?`이며, 비어 있지 않은 입력란에서는 일반 문자로 입력됩니다.
+
+`csql-future --keymap ./keys.json -u dba mydb`로 다른 파일을 선택할 수 있습니다.
+이 실행에서는 사용자 기본 파일 대신 선택한 파일을 읽습니다.
+어느 파일이든 내장 기본값에서 변경할 동작만 지정하면 됩니다.
+사용자 기본 파일이 없으면 내장 기본값을 사용하지만, 명시적으로 선택한 파일이 없으면 오류입니다.
+
+모든 기본 동작과 키를 복사하려면 다음 명령을 실행합니다.
+
+```bash
+csql-future --print-keymap > keys.json
+```
+
+`Ctrl+A`부터 `Ctrl+Z`, `Ctrl+Space`, `Ctrl+@`, `Ctrl+[`, `Ctrl+\`, `Ctrl+]`,
+`Ctrl+^`, `Ctrl+_`, Alt와 영문자·숫자 조합,
+`Enter`, `Ctrl+Enter`, `Alt+Enter`, `Tab`, `Esc`, `Space`, `Backspace`,
+`Delete`, `Insert`, `Left`, `Right`, `Up`, `Down`, `Home`, `End`,
+`PageUp`, `PageDown`, `F1`부터 `F12`를 지원합니다.
+이름이 있는 키는 대소문자를 구분하지 않습니다. Alt 뒤 문자는 대소문자를 구분하며,
+`Alt+O`는 터미널의 기능 키 시퀀스와 시작 부분이 같아 지원하지 않습니다.
+출력 가능한 문자 하나도 지정할 수 있습니다.
+`Ctrl+X Ctrl+V`처럼 공백으로 나누면 순서대로 누르는 키 조합입니다.
+접두 키를 누르면 다음 키를 기다립니다. 조합이 일치하지 않으면 접두 키를 버리고
+마지막 키를 평소대로 처리합니다.
+
+잘못된 JSON, 알 수 없는 동작·키, 중복된 동작 이름, 키 충돌이 있으면
+파일 경로를 표시하고 CSQL을 시작하기 전에 종료 코드 2로 끝납니다.
+다른 동작이 쓰는 키를 재사용하려면 같은 파일에서 그 동작의 키도 변경하거나 비웁니다.
+하나의 단축키가 다른 단축키의 접두 키가 될 수는 없습니다.
+터미널에서 같은 바이트를 보내는 키도 충돌합니다.
+예를 들어 `Ctrl+I`와 `Tab`, `Ctrl+M`과 `Enter`는 같은 키로 취급합니다.
+`Ctrl+Enter`는 LF도 허용하므로 `Ctrl+J`와 인코딩이 겹칩니다.
+같은 동작에 이런 키를 함께 지정하는 것은 가능합니다.
+Ctrl+Enter의 터미널 지원 조건은 아래 설명을 따릅니다.
+
+키맵은 래퍼 편집기, 검색, 자동 완성, 도움말에 적용됩니다.
+배치 실행에서는 키맵을 읽지 않습니다. CSQL이나 외부 프로그램이 입력을 소유하는 동안에는
+해당 프로그램이 키를 처리합니다. 아래 대화형 입력 설명은 기본 단축키 기준입니다.
 
 ## 대화형 입력
 

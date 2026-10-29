@@ -36,7 +36,7 @@ csql-future -u dba mydb
 must be on `PATH`. `just sync` can run from any working directory with
 `just --justfile /path/to/csql-future/justfile sync`.
 The installation remains usable after the source checkout moves or disappears.
-`--help` and `--version` work without a CUBRID installation. Other arguments
+`--help`, `--version`, and `--print-keymap` work without a CUBRID installation. Other arguments
 pass through to csql; run `csql` directly for its native usage.
 
 For development, run `uv sync`, `just test`, or
@@ -64,6 +64,9 @@ The accepted wrapper options are:
 - `--no-history`, which disables saving while retaining read-only recall from an
   existing selected history file.
 - `--no-completion`, which disables schema lookups and keeps literal Tab input.
+- `--keymap PATH`, which loads shortcut overrides from the selected JSON file.
+  Relative paths resolve from the launch directory.
+- `--print-keymap`, which prints all default actions and keys, then exits.
 
 Pipe input and csql's `-i`/`--input-file` and `-c`/`--command` forms go straight
 to csql without creating or changing wrapper history. Process replacement
@@ -71,6 +74,68 @@ preserves csql's standard streams, redirections, signals, and exit status. The
 parser recognizes csql options that take values so SQL, passwords, filenames,
 and other values resembling wrapper options remain csql values. Use `--` to
 stop all wrapper-option processing.
+
+<a id="customize-shortcuts"></a>
+
+## Customize shortcuts
+
+Create `~/.config/csql-future/keymap.json` to override editor shortcuts.
+If `XDG_CONFIG_HOME` is set, the file is
+`$XDG_CONFIG_HOME/csql-future/keymap.json` instead.
+For example, this file changes history search, the external editor, and help,
+and disables character transposition:
+
+```json
+{
+  "search": ["Alt+r"],
+  "external_editor": ["F4", "Ctrl+X Ctrl+V"],
+  "help": ["F2"],
+  "transpose": []
+}
+```
+
+Restart `csql-future` to load changes. Status hints and help show the active keys.
+Each action's list replaces all its default keys. Omitted actions keep their
+defaults. An empty list disables an action. Removing the file restores defaults.
+`help_empty` controls the single character that opens help in an empty field.
+Its default is `?`, and the character remains literal text in nonempty fields.
+
+Use `csql-future --keymap ./keys.json -u dba mydb` to select a different file.
+This file replaces the user file for that launch. Both files contain overrides
+of the built-in defaults. A missing user file uses defaults, while a missing
+explicit file is an error.
+
+To copy every default action and binding into a file, run:
+
+```bash
+csql-future --print-keymap > keys.json
+```
+
+Keys include `Ctrl+A` through `Ctrl+Z`, `Ctrl+Space`, `Ctrl+@`, `Ctrl+[`,
+`Ctrl+\`, `Ctrl+]`, `Ctrl+^`, `Ctrl+_`, Alt with a letter or digit,
+`Enter`, `Ctrl+Enter`, `Alt+Enter`, `Tab`, `Esc`, `Space`, `Backspace`,
+`Delete`, `Insert`, `Left`, `Right`, `Up`, `Down`, `Home`, `End`,
+`PageUp`, `PageDown`, and `F1` through `F12`.
+Named keys are case-insensitive. Alt letters preserve case, and `Alt+O` is
+unavailable because its terminal encoding starts a function-key sequence.
+A single printable character can also be bound.
+Separate successive keys with spaces, as in `Ctrl+X Ctrl+V`.
+A prefix waits for the next key. If the sequence does not match, the editor
+handles the last key normally and discards the prefix.
+
+Invalid JSON, unknown actions or keys, duplicate action names, and conflicting
+bindings stop interactive startup with exit status 2 and identify the file.
+To reuse another action's key, change or disable that action in the same file.
+A shortcut cannot also be the prefix of another shortcut.
+Terminals can send identical bytes for different keys. For example, `Ctrl+I`
+and `Tab` conflict, as do `Ctrl+M` and `Enter`. `Ctrl+Enter` accepts LF, so it
+shares an encoding with `Ctrl+J`. Such aliases can belong to the same action.
+Ctrl+Enter support still depends on your terminal, as described below.
+
+Keymaps affect the wrapper editor, search, completion, and help.
+Batch launches skip keymap loading. While CSQL or an external program owns
+input, that program handles the keys.
+The following input instructions describe the default bindings.
 
 ## Interactive input
 

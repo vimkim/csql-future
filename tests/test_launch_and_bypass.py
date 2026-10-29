@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -57,6 +58,7 @@ class LaunchAndBypassTest(unittest.TestCase):
     )
     self.csql.chmod(0o755)
     self.environment = os.environ.copy()
+    self.environment["XDG_CONFIG_HOME"] = str(self.root / "config")
     self.environment["PATH"] = os.pathsep.join((str(self.bin_directory), self.environment.get("PATH", "")))
 
   def run_process(self, command: list[str], input_bytes: bytes) -> subprocess.CompletedProcess[bytes]:
@@ -69,6 +71,36 @@ class LaunchAndBypassTest(unittest.TestCase):
       env=self.environment,
       check=False,
     )
+
+  def test_print_keymap_works_without_csql_and_round_trips(self) -> None:
+    self.environment["PATH"] = str(self.root / "missing-bin")
+    result = self.run_process([str(WRAPPER), "--print-keymap"], b"")
+    self.assertEqual(0, result.returncode)
+    self.assertEqual(b"", result.stderr)
+    bindings = json.loads(result.stdout)
+    self.assertEqual(["Ctrl+R"], bindings["search"])
+    self.assertEqual(["Ctrl+X Ctrl+E"], bindings["external_editor"])
+    from csql_future.keymap import Keymap
+    Keymap(bindings)
+
+  def test_batch_bypass_ignores_invalid_keymaps(self) -> None:
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    default.parent.mkdir(parents=True)
+    default.write_text("invalid JSON", encoding="utf-8")
+    arguments = ["-c", "select 7", "synthetic_db"]
+    direct = self.run_process([str(self.csql), *arguments], b"input")
+    wrapped = self.run_process([str(WRAPPER), "--keymap", "missing.json", *arguments], b"input")
+    self.assertEqual(direct.returncode, wrapped.returncode)
+    self.assertEqual(direct.stdout, wrapped.stdout)
+    self.assertEqual(direct.stderr, wrapped.stderr)
+
+  def test_keymap_requires_a_nonempty_path(self) -> None:
+    for arguments in (["--keymap"], ["--keymap=", "synthetic_db"]):
+      with self.subTest(arguments=arguments):
+        result = self.run_process([str(WRAPPER), *arguments], b"")
+        self.assertEqual(2, result.returncode)
+        self.assertEqual(b"", result.stdout)
+        self.assertIn(b"--keymap requires", result.stderr)
 
   def test_pipe_bypass_preserves_process_behavior_without_touching_history(self) -> None:
     input_bytes = b"select 424242;\n"
@@ -99,6 +131,9 @@ class LaunchAndBypassTest(unittest.TestCase):
     cases = (
       ["-p", "--no-history", "synthetic_db"],
       ["--password", "--history-limit", "synthetic_db"],
+      ["--password", "--keymap", "synthetic_db"],
+      ["--pass", "--keymap=secret", "synthetic_db"],
+      ["--", "--keymap", "keys.json"],
       ["--pass", "--history-file", "synthetic_db"],
       ["-c", "--history-file", "synthetic_db"],
       ["--command=--no-history", "synthetic_db"],

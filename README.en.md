@@ -130,6 +130,10 @@ independently of the checkout.
 
 ## Keyboard shortcuts
 
+Defaults are shown below. [Customize shortcuts](docs/usage.en.md#customize-shortcuts)
+with `~/.config/csql-future/keymap.json` or `--keymap PATH`.
+Run `csql-future --print-keymap` to list every action and its default keys.
+
 | Key | Action |
 | --- | --- |
 | **Ctrl+R** | Search saved commands with multiple terms |
@@ -157,6 +161,8 @@ independently of the checkout.
 | `--history-limit N` | Retain the latest N unique commands. Default: 10,000 |
 | `--no-history` | Read existing history without saving new submissions |
 | `--no-completion` | Skip metadata queries and keep literal Tab input |
+| `--keymap PATH` | Load custom shortcuts from JSON |
+| `--print-keymap` | Print every default action and key |
 
 ### Schema completion boundaries
 

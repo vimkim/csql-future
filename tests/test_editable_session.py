@@ -194,6 +194,7 @@ finally:
     )
     self.raw_handoff.chmod(0o755)
     self.environment = os.environ.copy()
+    self.environment["XDG_CONFIG_HOME"] = str(self.root / "config")
     self.environment["PATH"] = os.pathsep.join((str(self.bin_directory), self.environment.get("PATH", "")))
     self.environment["SYNTHETIC_RAW_HANDOFF"] = str(self.raw_handoff)
     self.environment["SYNTHETIC_CATALOG_LOG"] = str(self.root / "catalog.log")
@@ -220,6 +221,178 @@ finally:
     )
     self.addCleanup(session.close)
     return session
+
+  def write_keymap(self, overrides: dict, path: Path | None = None) -> Path:
+    path = path or self.root / "keys.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(overrides), encoding="utf-8")
+    return path
+
+  def test_custom_search_keys_replace_defaults_and_update_status_and_help(self) -> None:
+    self.write_keymap({"search": ["Alt+r"], "quit": ["F10"], "help": ["F2"]})
+    session = self.start(["--keymap", "keys.json"])
+    session.read_until(b"csql-future>")
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn("Alt+r history", screen)
+    self.assertIn("F10 quit", screen)
+    self.assertNotIn("Ctrl+R history", screen)
+    session.send(b"\x1bOQ")
+    session.read_for(0.05)
+    help_screen = self.rendered_screen(session)
+    self.assertIn("Alt+r: Search query history", help_screen)
+    self.assertIn("F10: quit", help_screen)
+    self.assertNotIn("Ctrl+R", help_screen)
+    session.send(b"\x1bOQselect custom;\r")
+    session.read_until(b'EXECUTED=["select custom;"]')
+    session.read_until(b"csql-future>")
+    session.send(b"\x12")
+    session.read_for(0.05)
+    self.assertNotIn("History search:", self.rendered_screen(session))
+    session.send(b"\x1brcustom")
+    session.read_until(b"History search:")
+    session.send(b"\r\r")
+    session.read_until(b'EXECUTED=["select custom;"]')
+    session.read_until(b"csql-future>")
+    session.send(b"unfinished\x1b[21~")
+    self.assertEqual(0, session.wait())
+    self.assertEqual(["select custom;"], self.stored_commands())
+    self.assertEqual(session.initial_attributes, session.terminal_attributes())
+
+  def test_default_user_keymap_and_explicit_override(self) -> None:
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    self.write_keymap({"search": ["F2"]}, default)
+    self.write_keymap({"search": ["F3"]})
+    for arguments, label, sequence in (([], "F2", b"\x1bOQ"), (["--keymap=keys.json"], "F3", b"\x1bOR")):
+      with self.subTest(arguments=arguments):
+        session = self.start(arguments)
+        session.read_until(b"csql-future>")
+        session.read_for(0.05)
+        self.assertIn(label + " history", self.rendered_screen(session))
+        session.send(sequence)
+        session.read_until(b"History search:")
+        session.send(b"\x11")
+        self.assertEqual(0, session.wait())
+
+  def test_user_keymap_uses_home_when_xdg_config_home_is_unset(self) -> None:
+    self.environment.pop("XDG_CONFIG_HOME", None)
+    self.environment["HOME"] = str(self.root / "home")
+    self.write_keymap({"search": ["F2"]}, self.root / "home/.config/csql-future/keymap.json")
+    session = self.start()
+    session.read_until(b"csql-future>")
+    session.send(b"\x1bOQ")
+    session.read_until(b"History search:")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
+  def test_invalid_user_keymap_encoding_and_unreadable_explicit_file(self) -> None:
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    default.parent.mkdir(parents=True)
+    default.write_bytes(b"\xff")
+    session = self.start()
+    self.assertEqual(2, session.wait())
+    self.assertIn(b"cannot read keymap", bytes(session.output))
+    session = self.start(["--keymap", "."])
+    self.assertEqual(2, session.wait())
+    self.assertIn(b"cannot read keymap", bytes(session.output))
+
+  def test_multi_key_shortcuts_and_unmatched_prefix_keep_editing(self) -> None:
+    self.write_keymap({"search": ["Ctrl+X Ctrl+R"], "external_editor": ["F4"], "left": ["Alt+h"]})
+    session = self.start(["--keymap", "keys.json"])
+    session.read_until(b"csql-future>")
+    session.send(b"select 1;\x1bh\x18a\r")
+    session.read_until(b'EXECUTED=["select 1a;"]')
+    session.read_until(b"csql-future>")
+    session.send(b"\x18")
+    session.read_for(0.1)
+    session.send(b"\x12")
+    session.read_until(b"History search:")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
+  def test_custom_complete_accept_and_newline_keys(self) -> None:
+    self.enable_catalog()
+    self.write_keymap({"complete": ["F2"], "submit": ["F3"], "newline": ["Alt+j"]})
+    session = self.start(["--keymap", "keys.json"])
+    session.read_until(b"csql-future>")
+    session.send(b"sel\x1bOQ")
+    session.read_until(b"Completion |")
+    session.read_for(0.05)
+    screen = self.rendered_screen(session)
+    self.assertIn("F3 accepts", screen)
+    session.send(b"\x1bOR")
+    session.read_for(0.05)
+    self.assertNotIn("Completion |", self.rendered_screen(session))
+    self.assertEqual([], self.stored_commands())
+    session.send(b" 1;\x1bjselect 2;\x1bOR")
+    session.read_until(b'EXECUTED=["SELECT 1;"]')
+    session.read_until(b'EXECUTED=["select 2;"]')
+    self.assertEqual(["SELECT 1;\nselect 2;"], self.stored_commands())
+    session.read_until(b"csql-future>")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
+  def test_custom_external_editor_and_disabled_shortcuts(self) -> None:
+    self.write_keymap({"external_editor": ["F4"], "help_empty": [], "transpose": []})
+    self.configure_editor("path.write_text('select from_editor;\\n')\n")
+    session = self.start(["--keymap", "keys.json"])
+    session.read_until(b"csql-future>")
+    session.send(b"?ab;\x14\x18\x05\r")
+    session.read_until(b'EXECUTED=["?ab;"]')
+    session.read_until(b"csql-future>")
+    session.send(b"\x1bOS")
+    session.read_until(b"select from_editor;")
+    session.send(b"\r")
+    session.read_until(b'EXECUTED=["select from_editor;"]')
+    self.assertEqual(["?ab;", "select from_editor;"], self.stored_commands())
+    session.read_until(b"csql-future>")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
+  def test_custom_empty_field_help_key_stays_literal_inside_sql(self) -> None:
+    self.write_keymap({"help_empty": ["!"]})
+    session = self.start(["--keymap", "keys.json"])
+    session.read_until(b"csql-future>")
+    session.send(b"!")
+    session.read_until(b"Shortcuts: Input mode")
+    session.send(b"!select '!?';\r")
+    session.read_until(b"EXECUTED=[\"select '!?';\"]")
+    session.read_until(b"csql-future>")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
+  def test_invalid_keymaps_stop_before_starting_csql(self) -> None:
+    pid_file = self.root / "csql.pid"
+    self.environment["SYNTHETIC_PID_FILE"] = str(pid_file)
+    cases = (
+      ('{', "invalid keymap"),
+      ('[]', "must be a JSON object"),
+      ('null', "must be a JSON object"),
+      ('{"serch": ["F2"]}', "unknown action"),
+      ('{"search": "F2"}', "list of key strings"),
+      ('{"search": [2]}', "list of key strings"),
+      ('{"search": ["Ctrl+F13"]}', "unknown key"),
+      ('{"search": [""]}', "empty shortcut"),
+      ('{"search": ["Ctrl+E"]}', "conflicts with"),
+      ('{"search": ["Ctrl+I"]}', "conflicts with"),
+      ('{"search": ["Ctrl+X"]}', "is a prefix"),
+      ('{"help_empty": ["F2"]}', "single printable character"),
+      ('{"search": [], "search": ["F2"]}', "duplicate action"),
+    )
+    for content, message in cases:
+      with self.subTest(content=content):
+        (self.root / "keys.json").write_text(content, encoding="utf-8")
+        session = self.start(["--keymap", "keys.json"])
+        self.assertEqual(2, session.wait())
+        self.assertIn(message, bytes(session.output).decode())
+        self.assertNotIn(b"Traceback", bytes(session.output))
+        self.assertFalse(pid_file.exists())
+        self.assertFalse((self.root / ".csql_history.sqlite3").exists())
+        self.assertEqual(session.initial_attributes, session.terminal_attributes())
+    session = self.start(["--keymap", "missing.json"])
+    self.assertEqual(2, session.wait())
+    self.assertIn(b"cannot read keymap", bytes(session.output))
+    self.assertFalse(pid_file.exists())
 
   def stored_commands(self, path: Path | None = None) -> list[str]:
     selected = path or self.root / ".csql_history.sqlite3"
@@ -1087,7 +1260,7 @@ finally:
     self.assertIn('EXECUTED=["select transcript;"]', "\n".join(screen.display()))
     draft_row = next(row for row, line in enumerate(screen.display()) if "csql-future>" in line)
     title_row = draft_row + 1
-    footer_row = next(row for row, line in enumerate(screen.display()) if "PgUp/PgDn page" in line)
+    footer_row = next(row for row, line in enumerate(screen.display()) if "PageUp / PageDown page" in line)
     footer = screen.display()[footer_row]
     session.send(b"\x1b[F")
     screen.feed(session.read_for(0.05))
