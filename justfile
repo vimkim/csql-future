@@ -2,10 +2,11 @@
 default:
     @just --list
 
-# Install or refresh an independent user-level command.
+# Install or refresh both user-level commands.
 sync:
     uv tool install --reinstall .
     @"$(uv tool dir --bin)/csql-future" --version
+    @"$(uv tool dir --bin)/csqlf" --version
 
 # Verify the packaged launcher through external processes and pseudo-terminals.
 test:

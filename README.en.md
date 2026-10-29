@@ -107,9 +107,10 @@ environment with `csql` on `PATH`. There are no mandatory Python runtime depende
 
 ```bash
 uv tool install git+https://github.com/vimkim/csql-future.git
-csql-future -u dba mydb
+csqlf -u dba mydb
 ```
 
+`csqlf` is a shorter name for `csql-future`. Both commands behave identically.
 Use your normal CSQL connection options, including `-S` for standalone mode and
 `-C` for client/server mode. `--help` and `--version` work without CUBRID installed.
 
@@ -121,7 +122,7 @@ cd csql-future
 just sync
 ```
 
-`just sync` installs the command into uv's tool bin directory, normally
+`just sync` installs `csql-future` and `csqlf` into uv's tool bin directory, normally
 `~/.local/bin`. Keep that directory on `PATH`. The installed tool works
 independently of the checkout. Existing `csql-with-history` users can keep their `.csql_history.sqlite3` files.
 

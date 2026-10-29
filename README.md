@@ -109,9 +109,10 @@ Linux, Python **3.10 이상**, [uv](https://docs.astral.sh/uv/),
 
 ```bash
 uv tool install git+https://github.com/vimkim/csql-future.git
-csql-future -u dba mydb
+csqlf -u dba mydb
 ```
 
+`csqlf`는 `csql-future`의 짧은 명령 이름이며, 두 명령은 동일하게 동작합니다.
 기존 CSQL 접속 옵션을 그대로 사용합니다. 독립 모드는 `-S`, 클라이언트/서버 모드는 `-C`입니다.
 `--help`와 `--version`은 CUBRID 설치 없이도 확인할 수 있습니다.
 
@@ -123,7 +124,7 @@ cd csql-future
 just sync
 ```
 
-`just sync`는 uv 도구 디렉터리(일반적으로 `~/.local/bin`)에 명령을 설치합니다.
+`just sync`는 uv 도구 디렉터리(일반적으로 `~/.local/bin`)에 `csql-future`와 `csqlf`를 설치합니다.
 이 경로를 `PATH`에 추가하세요. 설치 후에는 소스 체크아웃과 독립적으로 실행됩니다.
 기존 `csql-with-history`의 `.csql_history.sqlite3` 파일도 이어서 사용할 수 있습니다.
 

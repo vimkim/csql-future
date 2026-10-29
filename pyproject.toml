@@ -14,6 +14,7 @@ dependencies = []
 
 [project.scripts]
 csql-future = "csql_future.cli:main"
+csqlf = "csql_future.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/csql_future"]
