@@ -124,7 +124,7 @@ just sync
 
 `just sync` installs `csql-future` and `csqlf` into uv's tool bin directory, normally
 `~/.local/bin`. Keep that directory on `PATH`. The installed tool works
-independently of the checkout. Existing `csql-with-history` users can keep their `.csql_history.sqlite3` files.
+independently of the checkout.
 
 <a id="keyboard-shortcuts"></a>
 

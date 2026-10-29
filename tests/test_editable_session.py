@@ -1366,12 +1366,12 @@ finally:
     self.assertEqual(0, initializer.wait())
 
     seeded = [
-      ("select boundary_{:05d};".format(number),)
+      ("select boundary_{:05d};".format(number), time.time())
       for number in range(9_999)
     ]
     with closing(sqlite3.connect(history_file)) as connection:
       with connection:
-        connection.executemany("INSERT INTO submissions(command) VALUES (?)", seeded)
+        connection.executemany("INSERT INTO submissions(command, submitted_at) VALUES (?, ?)", seeded)
 
     first = self.start(arguments, database="default_target_one")
     second = self.start(arguments, database="default_target_two")

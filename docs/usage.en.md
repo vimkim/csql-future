@@ -195,11 +195,8 @@ truncated for display only; recalling them preserves their complete text.
 Each result has a right-aligned age such as `(3 min ago)` or `(2 days ago)`.
 This is the most recent **submission** time for that exact query, including
 submissions that failed. It is saved with history and survives restarts;
-memory-only history also tracks ages for the current session. Timestamps are
-recorded from this version onward. Older entries show `(time unknown)` until
-submitted again. Writable stores are upgraded automatically; `--no-history`
-can read older stores without modifying them. Narrow terminals shorten
-`(just now)` to `(now)` and `(time unknown)` to `(unknown)`.
+memory-only history also tracks ages for the current session. Narrow terminals
+shorten `(just now)` to `(now)`.
 
 The selected file is the history scope, independent of the database name or
 connection target. The default hidden file isolates launch directories; an
@@ -285,7 +282,7 @@ Ctrl+C typed while csql is running is relayed to csql's terminal rather than
 handled as an editor command. A direct-versus-wrapped acceptance case interrupts
 a three-way join of a 1,000-row physical table and successfully executes another
 query in both sessions. This does not imply that every csql query phase cancels
-immediately. The prototype's slow six-way `db_class` join is reproducible in the
+immediately. A slow six-way `db_class` join is reproducible in the
 production harness: both direct and wrapped csql emit a query plan, then fail to
 return within a bounded five seconds after Ctrl+C. That places the observed wait
 in query execution and demonstrates a direct-csql limitation, not wrapper-added
@@ -468,25 +465,5 @@ lock held beyond the busy timeout. It checks the warning and visible mode,
 continued SQL execution and recall, the no-retry behavior after releasing the
 lock, and the durable-versus-volatile boundary after restart.
 
-## Prototype provenance
-
-The separate throwaway prototype remains at
-`/home/vimkim/gh/cb/csql-with-history-prototype`, branch
-`prototype/csql-with-history`, inspected at commit `9394e38`. Its process-replace
-bypass and comparison patterns informed this slice, but its Python packages,
-PTY transport, SQLite layout, journal mode, and timeout choices are neither
-runtime dependencies nor production requirements here.
-
-## Extraction provenance and remaining work
-
-This standalone project was extracted from `CUBRID/CUBRID` worktree
-`/home/vimkim/gh/cb/csql-with-history`, branch `csql-with-history`, committed
-revision `27fe60a090d6ceefcc815014270d8eee14c4556c` (2026-09-17).
-Existing Apache-2.0 source notices and the license are preserved.
-The original worktree's uncommitted ticket 09 implementation was not included.
-
-This packaging task does not finish the original tickets 09–10: explicit
-ordinary-csql fallback for unsupported prompt states and the complete integrated
-production acceptance matrix remain pending in work-tracker item 172.
 The completion implementation and its verification progress are recorded in
 [the completion checklist](completion-plan.en.md).

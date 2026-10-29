@@ -130,12 +130,10 @@ class HistoryMode(Enum):
 @dataclass(frozen=True)
 class HistoryEntry:
   command: str
-  submitted_at: Optional[float] = None
+  submitted_at: float
 
 
-def format_history_age(submitted_at: Optional[float], now: Optional[float] = None) -> str:
-  if submitted_at is None:
-    return "time unknown"
+def format_history_age(submitted_at: float, now: Optional[float] = None) -> str:
   elapsed = max(0, int((time.time() if now is None else now) - submitted_at))
   if elapsed < 5:
     return "just now"
@@ -176,15 +174,12 @@ class SubmissionHistory:
       )
       if not save_disabled:
         self._enable_wal()
-        # Serialize legacy migration with other writers opening the same store.
         with self.connection:
           self.connection.execute("BEGIN IMMEDIATE")
           self.connection.execute(
             "CREATE TABLE IF NOT EXISTS submissions "
-            "(id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL)"
+            "(id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL NOT NULL)"
           )
-          if "submitted_at" not in self._columns():
-            self.connection.execute("ALTER TABLE submissions ADD COLUMN submitted_at REAL")
           self.connection.execute(
             "DELETE FROM submissions WHERE id NOT IN "
             "(SELECT MAX(id) FROM submissions GROUP BY command)"
@@ -250,16 +245,10 @@ class SubmissionHistory:
         seen.add(entry.command)
     return entries
 
-  def _columns(self) -> List[str]:
-    assert self.connection is not None
-    return [row[1] for row in self.connection.execute("PRAGMA table_info(submissions)")]
-
   def _refresh_memory(self) -> None:
     assert self.connection is not None
-    # --no-history must also read older stores without changing their schema.
-    timestamp_column = "submitted_at" if "submitted_at" in self._columns() else "NULL"
     rows = self.connection.execute(
-      "SELECT command, {} FROM submissions ORDER BY id".format(timestamp_column)
+      "SELECT command, submitted_at FROM submissions ORDER BY id"
     )
     self.memory_entries = [HistoryEntry(command, submitted_at) for command, submitted_at in rows]
 
@@ -934,7 +923,7 @@ class DraftEditor:
           marker = "> " if index == self.search.selected else "  "
           age_text = format_history_age(match.submitted_at)
           if content_width < 40:
-            age_text = age_text.replace("just now", "now").replace("time unknown", "unknown")
+            age_text = age_text.replace("just now", "now")
           age = "({})".format(age_text)
           age = self._truncate(age, max(0, content_width - len(marker) - 2))
           command_width = max(0, content_width - len(marker) - len(age) - 1)

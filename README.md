@@ -126,7 +126,6 @@ just sync
 
 `just sync`는 uv 도구 디렉터리(일반적으로 `~/.local/bin`)에 `csql-future`와 `csqlf`를 설치합니다.
 이 경로를 `PATH`에 추가하세요. 설치 후에는 소스 체크아웃과 독립적으로 실행됩니다.
-기존 `csql-with-history`의 `.csql_history.sqlite3` 파일도 이어서 사용할 수 있습니다.
 
 <a id="keyboard-shortcuts"></a>
 

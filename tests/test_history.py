@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""History deduplication, retention, timestamp compatibility, and relative ages."""
+"""History deduplication, retention, submission timestamps, and relative ages."""
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -39,38 +39,32 @@ class SubmissionHistoryTest(unittest.TestCase):
     self.addCleanup(history.close)
     return history
 
-  def stored_entries(self) -> list[tuple[str, float | None]]:
+  def stored_entries(self) -> list[tuple[str, float]]:
     with closing(sqlite3.connect(self.path)) as connection:
       return connection.execute(
         "SELECT command, submitted_at FROM submissions ORDER BY id"
       ).fetchall()
 
-  def make_legacy_history(self) -> None:
-    with closing(sqlite3.connect(self.path)) as connection:
-      connection.execute("CREATE TABLE submissions (id INTEGER PRIMARY KEY, command TEXT NOT NULL)")
-      connection.execute("INSERT INTO submissions(command) VALUES ('select legacy;')")
-      connection.commit()
-
-  def test_legacy_rows_keep_unknown_times_and_new_submissions_get_timestamps(self) -> None:
-    self.make_legacy_history()
+  def test_submission_timestamps_survive_restart(self) -> None:
     history = self.open_history()
-    self.assertIsNone(history.records()[0].submitted_at)
+    with patch("csql_future.cli.time.time", return_value=1000):
+      history.save("select first;")
     with patch("csql_future.cli.time.time", return_value=1234567890):
       history.save("select new;")
-    self.assertEqual(["select new;", "select legacy;"], history.entries())
+    self.assertEqual(["select new;", "select first;"], history.entries())
     history.close()
     restarted = self.open_history()
-    self.assertEqual([1234567890, None], [entry.submitted_at for entry in restarted.records()])
+    self.assertEqual([1234567890, 1000], [entry.submitted_at for entry in restarted.records()])
 
-  def test_read_only_legacy_history_is_not_migrated(self) -> None:
-    self.make_legacy_history()
-    with closing(sqlite3.connect(self.path)) as connection:
-      connection.execute("INSERT INTO submissions(command) VALUES ('select legacy;')")
-      connection.commit()
+  def test_read_only_history_preserves_entries_timestamps_and_file(self) -> None:
+    initializer = self.open_history()
+    with patch("csql_future.cli.time.time", return_value=1000):
+      initializer.save("select saved;")
+    initializer.close()
     original = self.path.read_bytes()
     history = self.open_history(save_disabled=True)
-    self.assertEqual(["select legacy;"], history.entries())
-    self.assertIsNone(history.records()[0].submitted_at)
+    self.assertEqual(["select saved;"], history.entries())
+    self.assertEqual(1000, history.records()[0].submitted_at)
     history.save("select excluded;")
     history.close()
     self.assertEqual(original, self.path.read_bytes())
@@ -78,7 +72,7 @@ class SubmissionHistoryTest(unittest.TestCase):
   def test_writable_open_keeps_the_latest_duplicate_row_and_timestamp(self) -> None:
     with closing(sqlite3.connect(self.path)) as connection:
       connection.execute(
-        "CREATE TABLE submissions (id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL)"
+        "CREATE TABLE submissions (id INTEGER PRIMARY KEY, command TEXT NOT NULL, submitted_at REAL NOT NULL)"
       )
       connection.executemany(
         "INSERT INTO submissions(command, submitted_at) VALUES (?, ?)",
@@ -94,21 +88,7 @@ class SubmissionHistoryTest(unittest.TestCase):
     self.assertEqual(["select repeat;", "select distinct;"], restarted.entries())
     self.assertEqual(expected, self.stored_entries())
 
-  def test_legacy_duplicates_are_cleaned_during_timestamp_migration(self) -> None:
-    self.make_legacy_history()
-    with closing(sqlite3.connect(self.path)) as connection:
-      connection.executemany(
-        "INSERT INTO submissions(command) VALUES (?)",
-        [("select distinct;",), ("select legacy;",)],
-      )
-      connection.commit()
-    history = self.open_history()
-    self.assertEqual(["select legacy;", "select distinct;"], history.entries())
-    self.assertEqual([("select distinct;", None), ("select legacy;", None)], self.stored_entries())
-
-  def test_concurrent_legacy_openers_both_migrate_and_read_the_store(self) -> None:
-    self.make_legacy_history()
-
+  def test_concurrent_openers_both_initialize_and_read_a_new_store(self) -> None:
     def read_history(_: int) -> list[str]:
       history = SubmissionHistory(self.path, 100, False)
       try:
@@ -118,7 +98,7 @@ class SubmissionHistoryTest(unittest.TestCase):
         history.close()
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-      self.assertEqual([["select legacy;"]] * 2, list(executor.map(read_history, range(2))))
+      self.assertEqual([[], []], list(executor.map(read_history, range(2))))
 
   def test_shared_history_deduplicates_using_the_latest_submission_time(self) -> None:
     first = self.open_history()
@@ -211,7 +191,7 @@ class SubmissionHistoryTest(unittest.TestCase):
       history.save("select volatile;")
     self.assertEqual(1000, history.records()[0].submitted_at)
 
-  def test_relative_ages_handle_boundaries_unknown_times_and_clock_skew(self) -> None:
+  def test_relative_ages_handle_boundaries_and_clock_skew(self) -> None:
     for elapsed, expected in (
       (0, "just now"), (3, "just now"), (5, "5 sec ago"),
       (59, "59 sec ago"), (60, "1 min ago"), (180, "3 min ago"),
@@ -220,4 +200,3 @@ class SubmissionHistoryTest(unittest.TestCase):
     ):
       with self.subTest(elapsed=elapsed):
         self.assertEqual(expected, format_history_age(1000000000 - elapsed, now=1000000000))
-    self.assertEqual("time unknown", format_history_age(None, now=1000000000))
