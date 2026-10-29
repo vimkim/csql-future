@@ -112,7 +112,7 @@ uv tool install git+https://github.com/vimkim/csql-future.git
 csqlf -u dba mydb
 ```
 
-`csqlf`는 `csql-future`의 짧은 명령 이름이며, 두 명령은 동일하게 동작합니다.
+`csql-future` 또는 단축 명령인 `csqlf`를 사용할 수 있습니다. 두 명령은 동일하게 동작합니다.
 기존 CSQL 접속 옵션을 그대로 사용합니다. 독립 모드는 `-S`, 클라이언트/서버 모드는 `-C`입니다.
 `--help`와 `--version`은 CUBRID 설치 없이도 확인할 수 있습니다.
 

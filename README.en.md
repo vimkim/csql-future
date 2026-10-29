@@ -110,7 +110,7 @@ uv tool install git+https://github.com/vimkim/csql-future.git
 csqlf -u dba mydb
 ```
 
-`csqlf` is a shorter name for `csql-future`. Both commands behave identically.
+You can use either `csql-future` or its shortcut, `csqlf`. Both commands behave identically.
 Use your normal CSQL connection options, including `-S` for standalone mode and
 `-C` for client/server mode. `--help` and `--version` work without CUBRID installed.
 
