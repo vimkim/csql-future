@@ -26,11 +26,11 @@ embedded raster images, or animation.
 ## Live demodb recording
 
 `demodb-demo.gif` records the actual editor against CUBRID's populated sample
-database in standalone mode. Its editable terminal source is `demodb-demo.cast`
+database in client/server mode. Its editable terminal source is `demodb-demo.cast`
 (asciicast v2). It uses the same palette as the SVGs, DejaVu Sans Mono, an
 88-column by 24-row terminal, and pauses at the completion menus.
 
-The sequence is: launch `csql-future -S -u dba --no-pager demodb`; complete
+The sequence is: launch `csql-future -C -u dba --no-pager demodb`; complete
 `s` to `SELECT`; open the hint menu and filter with `PARA`; accept `PARALLEL`
 and add `(2)`; complete `athlete` after `FROM`; return to the SELECT list and
 complete `name` and `code`; execute with `LIMIT 3`; complete `;plan detail`;
@@ -39,7 +39,7 @@ session setting. A temporary directory keeps the recording's query history
 separate from personal history.
 
 To record again, load a CUBRID environment with `csql` on PATH and an existing,
-populated `demodb` that is available for standalone access. Install this project
+populated `demodb` already started in client/server mode. Install this project
 with `just sync`, install [agg](https://github.com/asciinema/agg), and make the
 DejaVu Sans Mono font available. Then run from the repository root:
 
@@ -61,7 +61,7 @@ asciinema play assets/readme/demodb-demo.cast
 ## Live history recording
 
 `history-demo.gif` is a separate recording of Ctrl+R search and history
-navigation against real `demodb` in standalone mode. `history-demo.cast`
+navigation against real `demodb` in client/server mode. `history-demo.cast`
 preserves its terminal output. It shares the completion demo's palette,
 terminal dimensions, font, and recording prerequisites. `history.svg` remains
 available as a static illustration.

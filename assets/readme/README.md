@@ -26,11 +26,11 @@ README는 시연 동작을 Markdown으로도 설명하므로 작은 화면에서
 
 ## 실제 demodb 녹화
 
-`demodb-demo.gif`는 데이터가 들어 있는 CUBRID 샘플 DB를 독립 모드에서 열어 실제 편집기를 녹화합니다.
+`demodb-demo.gif`는 데이터가 들어 있는 CUBRID 샘플 DB를 클라이언트/서버 모드에서 열어 실제 편집기를 녹화합니다.
 편집 가능한 터미널 원본은 asciicast v2 형식의 `demodb-demo.cast`입니다.
 SVG와 같은 색상, DejaVu Sans Mono 글꼴, 88열·24행 터미널을 사용하고 완성 메뉴에서 잠시 멈춥니다.
 
-`csql-future -S -u dba --no-pager demodb`를 실행하고 `s`를 `SELECT`로 완성합니다.
+`csql-future -C -u dba --no-pager demodb`를 실행하고 `s`를 `SELECT`로 완성합니다.
 힌트 메뉴에서 `PARA`로 필터링해 `PARALLEL`을 선택하고 `(2)`를 붙입니다.
 `FROM` 뒤에서 `athlete`를 완성한 다음 SELECT 목록으로 돌아가 `name`·`code`를 완성합니다.
 `LIMIT 3`으로 실행하고 `;plan detail`을 완성한 뒤 `;exit`로 종료합니다.
@@ -38,7 +38,7 @@ SVG와 같은 색상, DejaVu Sans Mono 글꼴, 88열·24행 터미널을 사용�
 임시 디렉터리로 녹화 히스토리를 개인 히스토리와 분리합니다.
 
 다시 녹화하려면 `PATH`에 `csql`이 있는 CUBRID 환경과 데이터가 채워진 `demodb`가 필요합니다.
-DB는 독립 모드에서 접근할 수 있어야 합니다.
+녹화 전에 데이터가 채워진 `demodb`를 클라이언트/서버 모드로 시작해야 합니다.
 `just sync`로 프로젝트를 설치하고 [agg](https://github.com/asciinema/agg)와 DejaVu Sans Mono 글꼴을 준비합니다.
 저장소 루트에서 다음 명령을 실행합니다.
 
@@ -60,7 +60,7 @@ asciinema play assets/readme/demodb-demo.cast
 
 ## 실제 히스토리 녹화
 
-`history-demo.gif`는 실제 `demodb` 독립 모드에서 Ctrl+R 검색과 히스토리 탐색을
+`history-demo.gif`는 실제 `demodb` 클라이언트/서버 모드에서 Ctrl+R 검색과 히스토리 탐색을
 보여 주는 별도 녹화입니다. `history-demo.cast`에 터미널 출력을 보관합니다.
 자동 완성 영상과 같은 색상·터미널 크기·글꼴·녹화 환경을 사용합니다.
 `history.svg`도 정적 예시로 남아 있습니다.

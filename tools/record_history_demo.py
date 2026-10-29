@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Record a separate real demodb Ctrl+R history demo as an asciicast and GIF.
+"""Record a separate real demodb client/server Ctrl+R history demo as an asciicast and GIF.
 
-Requires the same loaded CUBRID environment, populated demodb, and recording
-tools as record_readme_demo.py. The completion recording is left untouched.
+Requires the same loaded CUBRID environment, populated demodb already started
+in client/server mode, and recording tools as record_readme_demo.py.
+The completion recording is left untouched.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ def main() -> None:
     try:
       session.expect("$ ")
       session.hold(0.7)
-      session.type("csql-future -S -u dba --no-pager demodb")
+      session.type("csql-future -C -u dba --no-pager demodb")
       session.key(b"\r", "csql-future>", hold=1.0)
 
       for query in queries:
@@ -96,7 +97,7 @@ def main() -> None:
 
   events = session.events[:loop_end]
   header = {"version": 2, "width": 88, "height": 24,
-            "title": "csql-future: search and recall real demodb query history",
+            "title": "csql-future: search and recall real demodb client/server query history",
             "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
   cast = output / "history-demo.cast"
   cast.write_text("\n".join(json.dumps(item) for item in [header, *events]) + "\n")

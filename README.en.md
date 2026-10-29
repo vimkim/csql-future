@@ -17,14 +17,14 @@ with the database, user, and connection options you normally use.
 ## Watch a demodb session
 
 <p align="center">
-  <img src="assets/readme/demodb-demo.gif" width="100%" alt="Real demodb standalone session: complete SELECT, filter hints to PARALLEL, choose athlete from table names, move back to complete its columns, run the query, complete a session command, and quit">
+  <img src="assets/readme/demodb-demo.gif" width="100%" alt="Real demodb client/server session: complete SELECT, filter hints to PARALLEL, choose athlete from table names, move back to complete its columns, run the query, complete a session command, and quit">
 </p>
 
 Start with `s` + **Tab**, accept `SELECT`, then open hint completion with
 `/*+` + **Tab** and type `PARA` to select `PARALLEL`. After `FROM` + **Tab**,
 choose `athlete`, move back after the hint, and press **Tab** for its columns.
 The recording runs the query, completes `;plan detail`, and quits with `;exit`.
-This is the real editor and CUBRID sample database in standalone (`-S`) mode.
+This is the real editor and CUBRID sample database in client/server (`-C`) mode.
 [Recording source and regeneration](assets/readme/README.en.md#live-demodb-recording).
 
 ## Ctrl+R: find the query instead of writing it again
@@ -39,7 +39,7 @@ substring somewhere in the query**. It does not correct typos or skip characters
 within a term.
 
 <p align="center">
-  <img src="assets/readme/history-demo.gif" width="100%" alt="Real demodb history demo: run two athlete queries, browse them with Ctrl+R and Down, search for name to leave one matching query, recall with Enter, then press Enter again to run it">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="Real demodb client/server history demo: run two athlete queries, browse them with Ctrl+R and Down, search for name to leave one matching query, recall with Enter, then press Enter again to run it">
 </p>
 
 The demo runs `select name from athlete limit 3;` and

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Record the real demodb standalone editor session as an asciicast and GIF.
+"""Record the real demodb client/server editor session as an asciicast and GIF.
 
-Requires a loaded CUBRID environment with a stopped, populated demodb,
-csql-future on PATH, and agg for GIF rendering. No database setup is performed.
+Requires a loaded CUBRID environment with a populated demodb already started
+in client/server mode, csql-future on PATH, and agg for GIF rendering.
+No database setup is performed.
 """
 
 from __future__ import annotations
@@ -86,7 +87,7 @@ def main() -> None:
     try:
       session.expect("$ ")
       session.hold(0.7)
-      session.type("csql-future -S -u dba --no-pager demodb")
+      session.type("csql-future -C -u dba --no-pager demodb")
       session.key(b"\r", "csql-future>", hold=1.5)
 
       # Complete a keyword, then open the unfiltered hint menu and narrow it.
@@ -153,7 +154,7 @@ def main() -> None:
   # Omit the shell's final exit echo while preserving the clean last prompt.
   events = session.events[:loop_end]
   header = {"version": 2, "width": 88, "height": 24,
-            "title": "csql-future: real demodb standalone session",
+            "title": "csql-future: real demodb client/server session",
             "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
   cast = output / "demodb-demo.cast"
   cast.write_text("\n".join(json.dumps(item) for item in [header, *events]) + "\n")

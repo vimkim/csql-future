@@ -19,14 +19,14 @@
 ## 실제 demodb 세션을 확인하세요
 
 <p align="center">
-  <img src="assets/readme/demodb-demo.gif" width="100%" alt="실제 demodb 독립 모드 시연: SELECT 완성, PARALLEL 힌트 필터링, athlete 테이블과 컬럼 완성, 쿼리 실행, 세션 명령 완성 후 종료">
+  <img src="assets/readme/demodb-demo.gif" width="100%" alt="실제 demodb 클라이언트/서버 모드 시연: SELECT 완성, PARALLEL 힌트 필터링, athlete 테이블과 컬럼 완성, 쿼리 실행, 세션 명령 완성 후 종료">
 </p>
 
 `s` 뒤에서 **Tab**으로 `SELECT`를 선택합니다. `/*+` 뒤에서 **Tab**으로 힌트 목록을
 열고 `PARA`를 입력해 `PARALLEL`을 고릅니다. `FROM` 뒤의 **Tab**으로 `athlete`를
 고른 다음 힌트 뒤 SELECT 목록으로 돌아가 **Tab**으로 해당 컬럼을 완성합니다.
 영상은 쿼리 실행, `;plan detail` 완성, `;exit` 종료까지 보여 줍니다.
-실제 편집기와 CUBRID 샘플 DB를 독립(`-S`) 모드로 실행한 녹화입니다.
+실제 편집기와 CUBRID 샘플 DB를 클라이언트/서버(`-C`) 모드로 실행한 녹화입니다.
 [녹화 원본과 재생성 방법](assets/readme/README.md#live-demodb-recording)을 참고하세요.
 
 ## Ctrl+R: 쿼리를 다시 쓰는 대신 찾아서 고치세요
@@ -40,7 +40,7 @@
 오타 보정이나 검색어 내부의 글자를 건너뛰는 매칭은 지원하지 않습니다.
 
 <p align="center">
-  <img src="assets/readme/history-demo.gif" width="100%" alt="실제 demodb 히스토리 시연: 쿼리 두 개를 실행하고 Ctrl+R과 아래 방향키로 탐색한 뒤 name을 검색해 결과를 하나로 좁히고 Enter로 불러와 다시 Enter로 실행합니다">
+  <img src="assets/readme/history-demo.gif" width="100%" alt="실제 demodb 클라이언트/서버 모드 히스토리 시연: 쿼리 두 개를 실행하고 Ctrl+R과 아래 방향키로 탐색한 뒤 name을 검색해 결과를 하나로 좁히고 Enter로 불러와 다시 Enter로 실행합니다">
 </p>
 
 영상은 `select name from athlete limit 3;`과 `select code from athlete limit 3;`을
