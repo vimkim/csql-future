@@ -1600,13 +1600,13 @@ Wrapper options:
   --history-limit N     Retain the latest N unique commands (default: 10000)
   --no-history          Recall existing history without saving new submissions
   --no-completion       Disable schema lookups and keep literal Tab input
-  --keymap PATH         Load editor shortcut overrides from a JSON file
-  --print-keymap        Print default shortcuts as JSON without requiring CUBRID
+  --keymap PATH         Load editor shortcut overrides from a TOML file
+  --print-keymap        Print default shortcuts as TOML without requiring CUBRID
   --help               Show this help without requiring CUBRID
   --version            Show the installed wrapper version
   --                   Forward remaining arguments to csql unchanged
 
-Default shortcuts (customize ~/.config/csql-future/keymap.json or $XDG_CONFIG_HOME/csql-future/keymap.json):
+Default shortcuts (customize ~/.config/csql-future/keymap.toml or $XDG_CONFIG_HOME/csql-future/keymap.toml):
 Input mode: ?/F1 shortcuts, Ctrl+R history search, Ctrl+X Ctrl+E external editor.
 History search mode: Ctrl+N/P selects, Enter recalls for editing, Esc restores the draft.
 Editor selection: $VISUAL, then $EDITOR, then vi. Save and exit to return to the draft.
@@ -1617,7 +1617,8 @@ Other arguments pass through to csql. Run csql directly for its native usage."""
     return 0
   if list(arguments) == ["--print-keymap"]:
     import json
-    print(json.dumps(DEFAULT_BINDINGS, indent=2))
+    for action, keys in DEFAULT_BINDINGS.items():
+      print("{} = {}".format(action, json.dumps(keys, ensure_ascii=False)))
     return 0
   if list(arguments) == ["--version"]:
     from importlib.metadata import version

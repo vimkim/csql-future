@@ -18,13 +18,17 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import textwrap
 import unittest
+
+try:
+  import tomllib
+except ModuleNotFoundError:
+  import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WRAPPER = Path(os.environ.get("CSQL_FUTURE_TEST_COMMAND", str(PROJECT_ROOT / ".venv/bin/csql-future")))
@@ -77,19 +81,19 @@ class LaunchAndBypassTest(unittest.TestCase):
     result = self.run_process([str(WRAPPER), "--print-keymap"], b"")
     self.assertEqual(0, result.returncode)
     self.assertEqual(b"", result.stderr)
-    bindings = json.loads(result.stdout)
+    bindings = tomllib.loads(result.stdout.decode("utf-8"))
     self.assertEqual(["Ctrl+R"], bindings["search"])
     self.assertEqual(["Ctrl+X Ctrl+E"], bindings["external_editor"])
     from csql_future.keymap import Keymap
     Keymap(bindings)
 
   def test_batch_bypass_ignores_invalid_keymaps(self) -> None:
-    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.toml"
     default.parent.mkdir(parents=True)
-    default.write_text("invalid JSON", encoding="utf-8")
+    default.write_text("invalid TOML", encoding="utf-8")
     arguments = ["-c", "select 7", "synthetic_db"]
     direct = self.run_process([str(self.csql), *arguments], b"input")
-    wrapped = self.run_process([str(WRAPPER), "--keymap", "missing.json", *arguments], b"input")
+    wrapped = self.run_process([str(WRAPPER), "--keymap", "missing.toml", *arguments], b"input")
     self.assertEqual(direct.returncode, wrapped.returncode)
     self.assertEqual(direct.stdout, wrapped.stdout)
     self.assertEqual(direct.stderr, wrapped.stderr)
@@ -133,7 +137,7 @@ class LaunchAndBypassTest(unittest.TestCase):
       ["--password", "--history-limit", "synthetic_db"],
       ["--password", "--keymap", "synthetic_db"],
       ["--pass", "--keymap=secret", "synthetic_db"],
-      ["--", "--keymap", "keys.json"],
+      ["--", "--keymap", "keys.toml"],
       ["--pass", "--history-file", "synthetic_db"],
       ["-c", "--history-file", "synthetic_db"],
       ["--command=--no-history", "synthetic_db"],

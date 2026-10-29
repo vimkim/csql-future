@@ -20,10 +20,15 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from itertools import product
-import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
+
+
+try:
+  import tomllib
+except ModuleNotFoundError:
+  import tomli as tomllib
 
 
 class EditorAction(Enum):
@@ -149,7 +154,7 @@ class Keymap:
     self.bindings: Dict[str, List[str]] = {action: list(keys) for action, keys in DEFAULT_BINDINGS.items()}
     if overrides is not None:
       if not isinstance(overrides, dict):
-        raise KeymapError("keymap must be a JSON object mapping actions to key lists")
+        raise KeymapError("keymap must map actions to key lists")
       for action, keys in overrides.items():
         if action not in DEFAULT_BINDINGS:
           raise KeymapError("unknown action {!r}; use --print-keymap to list actions".format(action))
@@ -195,16 +200,7 @@ class Keymap:
 
 def default_keymap_path() -> Path:
   directory = os.environ.get("XDG_CONFIG_HOME")
-  return (Path(directory) if directory else Path.home() / ".config") / "csql-future" / "keymap.json"
-
-
-def _unique_actions(pairs: Sequence[Tuple[str, object]]) -> dict:
-  result = {}
-  for name, value in pairs:
-    if name in result:
-      raise KeymapError("duplicate action {!r}".format(name))
-    result[name] = value
-  return result
+  return (Path(directory) if directory else Path.home() / ".config") / "csql-future" / "keymap.toml"
 
 
 def load_keymap(path: Optional[Path] = None) -> Keymap:
@@ -218,9 +214,6 @@ def load_keymap(path: Optional[Path] = None) -> Keymap:
   except (OSError, UnicodeError) as error:
     raise KeymapError("cannot read keymap {}: {}".format(selected, error)) from error
   try:
-    overrides = json.loads(text, object_pairs_hook=_unique_actions)
-    if not isinstance(overrides, dict):
-      raise KeymapError("keymap must be a JSON object mapping actions to key lists")
-    return Keymap(overrides)
+    return Keymap(tomllib.loads(text))
   except (ValueError, RecursionError) as error:
     raise KeymapError("invalid keymap {}: {}".format(selected, error)) from error

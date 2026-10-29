@@ -21,7 +21,9 @@ See the [internal introduction](internal-introduction.en.md) and [roadmap](roadm
 
 ## Runtime and installation
 
-The launcher uses Python 3.10 or newer and only the standard library at runtime.
+The launcher supports Python 3.10 or newer. Python 3.11 and newer use only
+the standard library at runtime. Python 3.10 automatically installs `tomli`
+for TOML parsing.
 It uses the `csql` executable on `PATH`, so selecting a CUBRID work environment
 also selects the underlying client. The wrapper installs independently of CUBRID.
 
@@ -64,7 +66,7 @@ The accepted wrapper options are:
 - `--no-history`, which disables saving while retaining read-only recall from an
   existing selected history file.
 - `--no-completion`, which disables schema lookups and keeps literal Tab input.
-- `--keymap PATH`, which loads shortcut overrides from the selected JSON file.
+- `--keymap PATH`, which loads shortcut overrides from the selected TOML file.
   Relative paths resolve from the launch directory.
 - `--print-keymap`, which prints all default actions and keys, then exits.
 
@@ -79,19 +81,18 @@ stop all wrapper-option processing.
 
 ## Customize shortcuts
 
-Create `~/.config/csql-future/keymap.json` to override editor shortcuts.
+Create `~/.config/csql-future/keymap.toml` to override editor shortcuts.
 If `XDG_CONFIG_HOME` is set, the file is
-`$XDG_CONFIG_HOME/csql-future/keymap.json` instead.
+`$XDG_CONFIG_HOME/csql-future/keymap.toml` instead.
 For example, this file changes history search, the external editor, and help,
 and disables character transposition:
 
-```json
-{
-  "search": ["Alt+r"],
-  "external_editor": ["F4", "Ctrl+X Ctrl+V"],
-  "help": ["F2"],
-  "transpose": []
-}
+```toml
+# Each list replaces the default keys for that action.
+search = ["Alt+r"]
+external_editor = ["F4", "Ctrl+X Ctrl+V"]
+help = ["F2"]
+transpose = []
 ```
 
 Restart `csql-future` to load changes. Status hints and help show the active keys.
@@ -100,7 +101,7 @@ defaults. An empty list disables an action. Removing the file restores defaults.
 `help_empty` controls the single character that opens help in an empty field.
 Its default is `?`, and the character remains literal text in nonempty fields.
 
-Use `csql-future --keymap ./keys.json -u dba mydb` to select a different file.
+Use `csql-future --keymap ./keys.toml -u dba mydb` to select a different file.
 This file replaces the user file for that launch. Both files contain overrides
 of the built-in defaults. A missing user file uses defaults, while a missing
 explicit file is an error.
@@ -108,7 +109,7 @@ explicit file is an error.
 To copy every default action and binding into a file, run:
 
 ```bash
-csql-future --print-keymap > keys.json
+csql-future --print-keymap > keys.toml
 ```
 
 Keys include `Ctrl+A` through `Ctrl+Z`, `Ctrl+Space`, `Ctrl+@`, `Ctrl+[`,
@@ -123,7 +124,7 @@ Separate successive keys with spaces, as in `Ctrl+X Ctrl+V`.
 A prefix waits for the next key. If the sequence does not match, the editor
 handles the last key normally and discards the prefix.
 
-Invalid JSON, unknown actions or keys, duplicate action names, and conflicting
+Invalid TOML, unknown actions or keys, duplicate action names, and conflicting
 bindings stop interactive startup with exit status 2 and identify the file.
 To reuse another action's key, change or disable that action in the same file.
 A shortcut cannot also be the prefix of another shortcut.

@@ -223,14 +223,16 @@ finally:
     return session
 
   def write_keymap(self, overrides: dict, path: Path | None = None) -> Path:
-    path = path or self.root / "keys.json"
+    path = path or self.root / "keys.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(overrides), encoding="utf-8")
+    text = "\n".join("{} = {}".format(action, json.dumps(keys, ensure_ascii=False))
+                     for action, keys in overrides.items())
+    path.write_text(text, encoding="utf-8")
     return path
 
   def test_custom_search_keys_replace_defaults_and_update_status_and_help(self) -> None:
     self.write_keymap({"search": ["Alt+r"], "quit": ["F10"], "help": ["F2"]})
-    session = self.start(["--keymap", "keys.json"])
+    session = self.start(["--keymap", "keys.toml"])
     session.read_until(b"csql-future>")
     session.read_for(0.05)
     screen = self.rendered_screen(session)
@@ -260,10 +262,10 @@ finally:
     self.assertEqual(session.initial_attributes, session.terminal_attributes())
 
   def test_default_user_keymap_and_explicit_override(self) -> None:
-    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.toml"
     self.write_keymap({"search": ["F2"]}, default)
     self.write_keymap({"search": ["F3"]})
-    for arguments, label, sequence in (([], "F2", b"\x1bOQ"), (["--keymap=keys.json"], "F3", b"\x1bOR")):
+    for arguments, label, sequence in (([], "F2", b"\x1bOQ"), (["--keymap=keys.toml"], "F3", b"\x1bOR")):
       with self.subTest(arguments=arguments):
         session = self.start(arguments)
         session.read_until(b"csql-future>")
@@ -277,7 +279,7 @@ finally:
   def test_user_keymap_uses_home_when_xdg_config_home_is_unset(self) -> None:
     self.environment.pop("XDG_CONFIG_HOME", None)
     self.environment["HOME"] = str(self.root / "home")
-    self.write_keymap({"search": ["F2"]}, self.root / "home/.config/csql-future/keymap.json")
+    self.write_keymap({"search": ["F2"]}, self.root / "home/.config/csql-future/keymap.toml")
     session = self.start()
     session.read_until(b"csql-future>")
     session.send(b"\x1bOQ")
@@ -286,7 +288,7 @@ finally:
     self.assertEqual(0, session.wait())
 
   def test_invalid_user_keymap_encoding_and_unreadable_explicit_file(self) -> None:
-    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.json"
+    default = Path(self.environment["XDG_CONFIG_HOME"]) / "csql-future/keymap.toml"
     default.parent.mkdir(parents=True)
     default.write_bytes(b"\xff")
     session = self.start()
@@ -298,7 +300,7 @@ finally:
 
   def test_multi_key_shortcuts_and_unmatched_prefix_keep_editing(self) -> None:
     self.write_keymap({"search": ["Ctrl+X Ctrl+R"], "external_editor": ["F4"], "left": ["Alt+h"]})
-    session = self.start(["--keymap", "keys.json"])
+    session = self.start(["--keymap", "keys.toml"])
     session.read_until(b"csql-future>")
     session.send(b"select 1;\x1bh\x18a\r")
     session.read_until(b'EXECUTED=["select 1a;"]')
@@ -313,7 +315,7 @@ finally:
   def test_custom_complete_accept_and_newline_keys(self) -> None:
     self.enable_catalog()
     self.write_keymap({"complete": ["F2"], "submit": ["F3"], "newline": ["Alt+j"]})
-    session = self.start(["--keymap", "keys.json"])
+    session = self.start(["--keymap", "keys.toml"])
     session.read_until(b"csql-future>")
     session.send(b"sel\x1bOQ")
     session.read_until(b"Completion |")
@@ -335,7 +337,7 @@ finally:
   def test_custom_external_editor_and_disabled_shortcuts(self) -> None:
     self.write_keymap({"external_editor": ["F4"], "help_empty": [], "transpose": []})
     self.configure_editor("path.write_text('select from_editor;\\n')\n")
-    session = self.start(["--keymap", "keys.json"])
+    session = self.start(["--keymap", "keys.toml"])
     session.read_until(b"csql-future>")
     session.send(b"?ab;\x14\x18\x05\r")
     session.read_until(b'EXECUTED=["?ab;"]')
@@ -351,7 +353,7 @@ finally:
 
   def test_custom_empty_field_help_key_stays_literal_inside_sql(self) -> None:
     self.write_keymap({"help_empty": ["!"]})
-    session = self.start(["--keymap", "keys.json"])
+    session = self.start(["--keymap", "keys.toml"])
     session.read_until(b"csql-future>")
     session.send(b"!")
     session.read_until(b"Shortcuts: Input mode")
@@ -361,35 +363,49 @@ finally:
     session.send(b"\x11")
     self.assertEqual(0, session.wait())
 
+  def test_toml_comments_and_literal_strings_customize_shortcuts(self) -> None:
+    (self.root / "keys.toml").write_text(
+      "# Search on F2, or press Ctrl+X and then Ctrl+R.\n"
+      "search = [\n  'F2',\n  'Ctrl+X Ctrl+R',\n] # Multiple bindings\n",
+      encoding="utf-8",
+    )
+    session = self.start(["--keymap", "keys.toml"])
+    session.read_until(b"csql-future>")
+    session.send(b"\x1bOQ")
+    session.read_until(b"History search:")
+    session.send(b"\x11")
+    self.assertEqual(0, session.wait())
+
   def test_invalid_keymaps_stop_before_starting_csql(self) -> None:
     pid_file = self.root / "csql.pid"
     self.environment["SYNTHETIC_PID_FILE"] = str(pid_file)
     cases = (
-      ('{', "invalid keymap"),
-      ('[]', "must be a JSON object"),
-      ('null', "must be a JSON object"),
-      ('{"serch": ["F2"]}', "unknown action"),
-      ('{"search": "F2"}', "list of key strings"),
-      ('{"search": [2]}', "list of key strings"),
-      ('{"search": ["Ctrl+F13"]}', "unknown key"),
-      ('{"search": [""]}', "empty shortcut"),
-      ('{"search": ["Ctrl+E"]}', "conflicts with"),
-      ('{"search": ["Ctrl+I"]}', "conflicts with"),
-      ('{"search": ["Ctrl+X"]}', "is a prefix"),
-      ('{"help_empty": ["F2"]}', "single printable character"),
-      ('{"search": [], "search": ["F2"]}', "duplicate action"),
+      ('search = [', "invalid keymap"),
+      ('[]', "invalid keymap"),
+      ('{"search": ["F2"]}', "invalid keymap"),
+      ('serch = ["F2"]', "unknown action"),
+      ('search = "F2"', "list of key strings"),
+      ('search = [2]', "list of key strings"),
+      ('search = ["Ctrl+F13"]', "unknown key"),
+      ('search = [""]', "empty shortcut"),
+      ('search = ["Ctrl+E"]', "conflicts with"),
+      ('search = ["Ctrl+I"]', "conflicts with"),
+      ('search = ["Ctrl+X"]', "is a prefix"),
+      ('help_empty = ["F2"]', "single printable character"),
+      ('search = []\nsearch = ["F2"]', "invalid keymap"),
+      ('[unexpected]\nsearch = ["F2"]', "unknown action"),
     )
     for content, message in cases:
       with self.subTest(content=content):
-        (self.root / "keys.json").write_text(content, encoding="utf-8")
-        session = self.start(["--keymap", "keys.json"])
+        (self.root / "keys.toml").write_text(content, encoding="utf-8")
+        session = self.start(["--keymap", "keys.toml"])
         self.assertEqual(2, session.wait())
         self.assertIn(message, bytes(session.output).decode())
         self.assertNotIn(b"Traceback", bytes(session.output))
         self.assertFalse(pid_file.exists())
         self.assertFalse((self.root / ".csql_history.sqlite3").exists())
         self.assertEqual(session.initial_attributes, session.terminal_attributes())
-    session = self.start(["--keymap", "missing.json"])
+    session = self.start(["--keymap", "missing.toml"])
     self.assertEqual(2, session.wait())
     self.assertIn(b"cannot read keymap", bytes(session.output))
     self.assertFalse(pid_file.exists())

@@ -103,7 +103,8 @@ after the list closes and you press Enter again. **Esc** keeps your current draf
 ## Get started
 
 Requires Linux, Python **3.10+**, [uv](https://docs.astral.sh/uv/), and a CUBRID
-environment with `csql` on `PATH`. There are no mandatory Python runtime dependencies.
+environment with `csql` on `PATH`. Python 3.11 and newer use only the standard library.
+Python 3.10 automatically installs `tomli` for TOML parsing.
 
 ```bash
 uv tool install git+https://github.com/vimkim/csql-future.git
@@ -131,7 +132,7 @@ independently of the checkout.
 ## Keyboard shortcuts
 
 Defaults are shown below. [Customize shortcuts](docs/usage.en.md#customize-shortcuts)
-with `~/.config/csql-future/keymap.json` or `--keymap PATH`.
+with `~/.config/csql-future/keymap.toml` or `--keymap PATH`.
 Run `csql-future --print-keymap` to list every action and its default keys.
 
 | Key | Action |
@@ -161,7 +162,7 @@ Run `csql-future --print-keymap` to list every action and its default keys.
 | `--history-limit N` | Retain the latest N unique commands. Default: 10,000 |
 | `--no-history` | Read existing history without saving new submissions |
 | `--no-completion` | Skip metadata queries and keep literal Tab input |
-| `--keymap PATH` | Load custom shortcuts from JSON |
+| `--keymap PATH` | Load custom shortcuts from TOML |
 | `--print-keymap` | Print every default action and key |
 
 ### Schema completion boundaries

@@ -20,7 +20,8 @@ Ctrl+R은 공백으로 나눈 검색어를 모두 포함하는 쿼리를 찾습�
 
 ## 실행 환경과 설치
 
-Python 3.10 이상과 표준 라이브러리만 사용합니다.
+Python 3.10 이상을 지원합니다. Python 3.11 이상에서는 표준 라이브러리만 사용하며,
+Python 3.10에서는 TOML 파서 `tomli`를 자동으로 설치합니다.
 `PATH`의 `csql`을 실행하므로 선택한 CUBRID 작업 환경에 따라 실제 클라이언트도 바뀝니다.
 도구는 CUBRID와 별도로 설치합니다.
 
@@ -63,8 +64,8 @@ CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 �
 | `--history-limit N` | 기본 10,000개. `N`은 정수 |
 | `--no-history` | 저장하지 않고 기존 선택 파일에서 읽기 전용으로 불러오기 |
 | `--no-completion` | 스키마 조회를 끄고 Tab을 문자 그대로 입력 |
-| `--keymap PATH` | 선택한 JSON 파일에서 단축키 변경 사항 읽기. 상대 경로는 실행 디렉터리 기준 |
-| `--print-keymap` | 모든 기본 동작과 키를 JSON으로 출력하고 종료 |
+| `--keymap PATH` | 선택한 TOML 파일에서 단축키 변경 사항 읽기. 상대 경로는 실행 디렉터리 기준 |
+| `--print-keymap` | 모든 기본 동작과 키를 TOML 형식으로 출력하고 종료 |
 
 파이프 입력과 CSQL의 `-i`/`--input-file`, `-c`/`--command`는 히스토리를 생성·변경하지 않고
 `csql`로 직접 전달합니다. 프로세스 교체로 표준 스트림, 리다이렉션, 시그널, 종료 상태를 유지합니다.
@@ -75,18 +76,17 @@ CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 �
 
 ## 단축키 변경
 
-`~/.config/csql-future/keymap.json`을 만들어 편집기 단축키를 변경합니다.
+`~/.config/csql-future/keymap.toml`을 만들어 편집기 단축키를 변경합니다.
 `XDG_CONFIG_HOME`이 설정되어 있으면
-`$XDG_CONFIG_HOME/csql-future/keymap.json`을 사용합니다.
+`$XDG_CONFIG_HOME/csql-future/keymap.toml`을 사용합니다.
 다음 예시는 히스토리 검색, 외부 편집기, 도움말 키를 바꾸고 문자 교환을 끕니다.
 
-```json
-{
-  "search": ["Alt+r"],
-  "external_editor": ["F4", "Ctrl+X Ctrl+V"],
-  "help": ["F2"],
-  "transpose": []
-}
+```toml
+# 동작별 목록은 해당 동작의 기본 키 전체를 대체합니다.
+search = ["Alt+r"]
+external_editor = ["F4", "Ctrl+X Ctrl+V"]
+help = ["F2"]
+transpose = []
 ```
 
 변경 후 `csql-future`를 다시 실행합니다. 상태 표시줄과 도움말에도 변경한 키가 나옵니다.
@@ -95,7 +95,7 @@ CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 �
 `help_empty`는 빈 입력란에서 도움말을 여는 문자 하나를 지정합니다.
 기본값은 `?`이며, 비어 있지 않은 입력란에서는 일반 문자로 입력됩니다.
 
-`csql-future --keymap ./keys.json -u dba mydb`로 다른 파일을 선택할 수 있습니다.
+`csql-future --keymap ./keys.toml -u dba mydb`로 다른 파일을 선택할 수 있습니다.
 이 실행에서는 사용자 기본 파일 대신 선택한 파일을 읽습니다.
 어느 파일이든 내장 기본값에서 변경할 동작만 지정하면 됩니다.
 사용자 기본 파일이 없으면 내장 기본값을 사용하지만, 명시적으로 선택한 파일이 없으면 오류입니다.
@@ -103,7 +103,7 @@ CUBRID 환경을 불러온 뒤 기존처럼 `cs [DATABASE] [CSQL OPTIONS]`를 �
 모든 기본 동작과 키를 복사하려면 다음 명령을 실행합니다.
 
 ```bash
-csql-future --print-keymap > keys.json
+csql-future --print-keymap > keys.toml
 ```
 
 `Ctrl+A`부터 `Ctrl+Z`, `Ctrl+Space`, `Ctrl+@`, `Ctrl+[`, `Ctrl+\`, `Ctrl+]`,
@@ -118,7 +118,7 @@ csql-future --print-keymap > keys.json
 접두 키를 누르면 다음 키를 기다립니다. 조합이 일치하지 않으면 접두 키를 버리고
 마지막 키를 평소대로 처리합니다.
 
-잘못된 JSON, 알 수 없는 동작·키, 중복된 동작 이름, 키 충돌이 있으면
+잘못된 TOML, 알 수 없는 동작·키, 중복된 동작 이름, 키 충돌이 있으면
 파일 경로를 표시하고 CSQL을 시작하기 전에 종료 코드 2로 끝납니다.
 다른 동작이 쓰는 키를 재사용하려면 같은 파일에서 그 동작의 키도 변경하거나 비웁니다.
 하나의 단축키가 다른 단축키의 접두 키가 될 수는 없습니다.

@@ -105,7 +105,8 @@ select <cursor> from employees;
 ## 설치하고 평소 csql처럼 접속하세요
 
 Linux, Python **3.10 이상**, [uv](https://docs.astral.sh/uv/),
-`PATH`에 `csql`이 있는 CUBRID 환경이 필요합니다. 필수 Python 런타임 의존성은 없습니다.
+`PATH`에 `csql`이 있는 CUBRID 환경이 필요합니다. Python 3.11 이상에서는 표준 라이브러리만 사용합니다.
+Python 3.10에서는 TOML 파서 `tomli`를 자동으로 설치합니다.
 
 ```bash
 uv tool install git+https://github.com/vimkim/csql-future.git
@@ -131,7 +132,7 @@ just sync
 
 ## 먼저 익힐 단축키
 
-아래는 기본 단축키입니다. `~/.config/csql-future/keymap.json` 또는 `--keymap PATH`로
+아래는 기본 단축키입니다. `~/.config/csql-future/keymap.toml` 또는 `--keymap PATH`로
 [단축키를 변경](docs/usage.md#customize-shortcuts)할 수 있습니다.
 `csql-future --print-keymap`으로 모든 동작과 기본 키를 확인합니다.
 
@@ -163,7 +164,7 @@ just sync
 | `--history-limit N` | 최근 고유 명령 보관 수 지정. 기본 10,000개 |
 | `--no-history` | 기존 히스토리는 읽되 새 명령은 저장하지 않음 |
 | `--no-completion` | 메타데이터 조회를 생략하고 Tab을 문자 그대로 입력 |
-| `--keymap PATH` | JSON 파일에서 사용자 단축키 읽기 |
+| `--keymap PATH` | TOML 파일에서 사용자 단축키 읽기 |
 | `--print-keymap` | 모든 기본 동작과 키 출력 |
 
 ### 스키마 완성의 동작 범위
