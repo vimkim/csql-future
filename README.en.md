@@ -10,6 +10,8 @@
 and multiline editing to your daily CSQL workflow. It runs your installed `csql`
 with the database, user, and connection options you normally use.
 
+Use **`csqlf`** as your everyday command.
+
 [Get started](#get-started) · [Keyboard shortcuts](#keyboard-shortcuts) ·
 [Usage guide](docs/usage.en.md) · [Documentation](docs/README.en.md) ·
 [Internal introduction and demo](docs/internal-introduction.en.md)
@@ -100,7 +102,7 @@ after the list closes and you press Enter again. **Esc** keeps your current draf
 
 <a id="get-started"></a>
 
-## Get started
+## Get started with `csqlf`
 
 Requires Linux, Python **3.10+**, [uv](https://docs.astral.sh/uv/), and a CUBRID
 environment with `csql` on `PATH`. Python 3.11 and newer use only the standard library.
@@ -111,7 +113,7 @@ uv tool install git+https://github.com/vimkim/csql-future.git
 csqlf -u dba mydb
 ```
 
-You can use either `csql-future` or its shortcut, `csqlf`. Both commands behave identically.
+The recommended command is **`csqlf`**. It supports the same options and behavior as `csql-future`.
 Use your normal CSQL connection options, including `-S` for standalone mode and
 `-C` for client/server mode. `--help` and `--version` work without CUBRID installed.
 
@@ -123,7 +125,7 @@ cd csql-future
 just sync
 ```
 
-`just sync` installs `csql-future` and `csqlf` into uv's tool bin directory, normally
+`just sync` installs `csqlf` and `csql-future` into uv's tool bin directory, normally
 `~/.local/bin`. Keep that directory on `PATH`. The installed tool works
 independently of the checkout.
 
@@ -133,7 +135,7 @@ independently of the checkout.
 
 Defaults are shown below. [Customize shortcuts](docs/usage.en.md#customize-shortcuts)
 with `~/.config/csql-future/keymap.toml` or `--keymap PATH`.
-Run `csql-future --print-keymap` to list every action and its default keys.
+Run `csqlf --print-keymap` to list every action and its default keys.
 
 | Key | Action |
 | --- | --- |
@@ -200,7 +202,7 @@ See the [roadmap](docs/roadmap.en.md) and [shared engine project](https://github
 
 ## Try it with one query you use today
 
-Connect with `csql-future`, submit a query, then find and edit it with Ctrl+R.
+Connect with `csqlf`, submit a query, then find and edit it with Ctrl+R.
 Try Tab after `SHOW `, `;`, a table prefix, and a column prefix.
 Start with the queries you already find and revise every day.
 

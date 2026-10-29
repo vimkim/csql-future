@@ -10,6 +10,8 @@
 **CUBRID 전용 자동 완성**, 여러 줄 편집을 더하는 터미널 도구입니다.
 설치된 `csql`을 그대로 실행하며, 익숙한 접속 옵션과 SQL 실행 흐름을 이어 갑니다.
 
+평소에는 짧은 명령 **`csqlf`**로 실행하세요.
+
 [설치](#get-started) · [단축키](#keyboard-shortcuts) ·
 [사용 가이드](docs/usage.md) · [문서 목차](docs/README.md) ·
 [CUBRID 구성원용 소개·시연](docs/internal-introduction.md)
@@ -102,7 +104,7 @@ select <cursor> from employees;
 
 <a id="get-started"></a>
 
-## 설치하고 평소 csql처럼 접속하세요
+## 설치하고 `csqlf`로 접속하세요
 
 Linux, Python **3.10 이상**, [uv](https://docs.astral.sh/uv/),
 `PATH`에 `csql`이 있는 CUBRID 환경이 필요합니다. Python 3.11 이상에서는 표준 라이브러리만 사용합니다.
@@ -113,7 +115,7 @@ uv tool install git+https://github.com/vimkim/csql-future.git
 csqlf -u dba mydb
 ```
 
-`csql-future` 또는 단축 명령인 `csqlf`를 사용할 수 있습니다. 두 명령은 동일하게 동작합니다.
+권장 실행 명령은 **`csqlf`**입니다. `csql-future`와 모든 옵션이 동일하게 동작합니다.
 기존 CSQL 접속 옵션을 그대로 사용합니다. 독립 모드는 `-S`, 클라이언트/서버 모드는 `-C`입니다.
 `--help`와 `--version`은 CUBRID 설치 없이도 확인할 수 있습니다.
 
@@ -125,7 +127,7 @@ cd csql-future
 just sync
 ```
 
-`just sync`는 uv 도구 디렉터리(일반적으로 `~/.local/bin`)에 `csql-future`와 `csqlf`를 설치합니다.
+`just sync`는 uv 도구 디렉터리(일반적으로 `~/.local/bin`)에 `csqlf`와 `csql-future`를 설치합니다.
 이 경로를 `PATH`에 추가하세요. 설치 후에는 소스 체크아웃과 독립적으로 실행됩니다.
 
 <a id="keyboard-shortcuts"></a>
@@ -134,7 +136,7 @@ just sync
 
 아래는 기본 단축키입니다. `~/.config/csql-future/keymap.toml` 또는 `--keymap PATH`로
 [단축키를 변경](docs/usage.md#customize-shortcuts)할 수 있습니다.
-`csql-future --print-keymap`으로 모든 동작과 기본 키를 확인합니다.
+`csqlf --print-keymap`으로 모든 동작과 기본 키를 확인합니다.
 
 | 키 | 동작 |
 | --- | --- |
@@ -202,7 +204,7 @@ just sync
 
 ## 오늘 쓰는 쿼리 하나로 시작해 보세요
 
-`csql-future`로 접속해 쿼리 하나를 실행한 다음, Ctrl+R로 찾아 수정해 보세요.
+`csqlf`로 접속해 쿼리 하나를 실행한 다음, Ctrl+R로 찾아 수정해 보세요.
 이어서 `SHOW `, `;`, 테이블명, 컬럼 위치에서 Tab을 눌러 보세요.
 자주 쓰는 SQL을 찾고 고치는 흐름에서 먼저 활용할 수 있습니다.
 
