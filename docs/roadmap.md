@@ -3,11 +3,11 @@
 **한국어** | [English](roadmap.en.md)
 
 `csql-future`는 CSQL의 일상적인 입력·검색을 개선하는 터미널 도구에서 출발합니다.
-공통 엔진의 아키텍처·구현은 별도 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에서 관리합니다.
-이 문서는 csql-future 사용자가 기대할 연동과 기능을 안내합니다.
+공통 엔진·린트 CLI·LSP는 별도 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에서 관리합니다.
+VS Code·Neovim 클라이언트는 이미 이 LSP를 사용합니다. 이 터미널은 여전히 자체 완성 엔진을 사용합니다.
 
-이 문서는 배포 기능과 개발 방향을 구분합니다. 설계 문서의 티켓과 명령은 구현 요구사항이며,
-그 자체로 설치 가능한 기능이나 전체 CUBRID 문법 지원을 뜻하지 않습니다.
+이 문서는 현재 터미널 기능, 독립 제품, 남은 작업을 구분합니다.
+[초기 언어 도구 계획](language-tools/README.md)은 과거 기록입니다.
 
 ## 지금 사용할 수 있는 기능
 
@@ -26,31 +26,41 @@
 힌트 이름은 CUBRID 11.5 소스 스냅샷을 사용합니다. 완성 후보 제공은 서버의 문법·권한 검사를 대신하지 않습니다.
 설치와 상세 제약은 [README](../README.md)와 [사용 가이드](usage.md)를 참고하세요.
 
-## 다음 언어 도구 배포 계획
+## 현재 제공하는 별도 언어 도구
 
-| 항목 | 제공하려는 동작 |
+| 프로젝트 | 현재 역할 |
 | --- | --- |
-| 공통 완성 코어 | 터미널과 편집기가 같은 문맥·식별자·별칭 처리 사용 |
-| LSP 언어 서버 | 편집기 문서에서 자동 완성과 문법 진단 제공 |
-| 오프라인 문법 검사 / 린트 CLI | SQL 실행이나 DB 접속 없이 검증된 CUBRID 파서로 검사 |
-| 스키마 스냅샷 | 편집기에서 메타데이터 JSON으로 테이블·컬럼 완성 |
-| VS Code 확장 | 완성·문법 진단·구문 강조·기본 들여쓰기·파일 연결 |
-| Neovim 연동 | 같은 LSP의 완성·진단, 구문 강조·들여쓰기·파일 연결 |
+| [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) | 공통 완성 코어, 오프라인 검사 `cubrid-lint`, `cubrid-language-server`, 선택적 스키마 스냅샷 |
+| [cubrid-vscode](https://github.com/vimkim/cubrid-vscode) | 공통 LSP의 완성·진단, 구문 강조, 기본 들여쓰기, 파일 연결 |
+| [cubrid.nvim](https://github.com/vimkim/cubrid.nvim) | 같은 LSP의 완성·진단, 구문 강조, 기본 들여쓰기, 파일 연결 |
 
-첫 검증 대상은 Linux x86-64와 CUBRID **11.5.0.2704-cc94778**입니다.
-파서 실험은 이 빌드의 작은 고정 예제 집합에서 DB 없이 파싱할 수 있음을 확인했습니다.
-운영용 워커, 문법 범위 검증, 편집기 패키징과 통합 검증은 별도 작업입니다.
-다른 11.5 빌드와 11.4 지원도 각각 검증해야 합니다.
+이 제품들은 각각 설치 안내를 제공합니다. `csql-future`를 설치해도
+`cubrid-lint`, `cubrid-language-server`, 편집기 클라이언트는 설치되지 않습니다.
+클라이언트는 별도로 설치한 서버를 사용합니다. 엄격한 문법 검사에는 검증된 네이티브 워커도 필요합니다.
 
-린팅의 첫 범위는 **문법 진단**입니다. 테이블 존재 여부·권한·실행 결과나 의미·스타일 규칙까지 검사한다는 뜻은 아닙니다.
-`cubrid-lint`와 `cubrid-language-server`는 설계된 명령 이름이며 현재 터미널 패키지의 설치 기능으로 안내하지 않습니다.
+현재 네이티브 검증 대상은 Linux x86-64의 정확한 CUBRID **11.5.0.2704-cc94778** 빌드이며,
+문법 지원은 한정된 부분집합입니다. 지원 구문과 코어·워커·매니페스트의 일치 조건은 코어 프로젝트의
+[현재 지원 범위](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/coverage.md)와
+[설치 가이드](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/install.md)를 확인하세요.
+다른 빌드·버전·플랫폼은 별도 검증이 필요합니다.
+
+공통 검사기는 제출된 SQL이나 CSQL 명령을 실행하지 않고 문법 검사 결과와 작성 경고를 제공합니다.
+객체 존재 여부·권한·실행 결과·의미·스타일 규칙은 검사하지 않습니다.
+이 검사는 터미널 완성과 별개입니다. SHOW·힌트 후보는 네이티브 문법 지원을 보장하지 않습니다.
+
+## 남은 터미널 연동 작업
+
+이 터미널의 자체 완성 엔진을 공통 코어로 전환하는 작업은 아직 남아 있습니다.
+완성 메뉴·히스토리·PTY 처리·SQL 실행은 터미널이 담당합니다.
+Ctrl+X Ctrl+E는 이미 외부 편집기를 엽니다. 해당 편집기에서 LSP 기능을 사용하려면
+별도 편집기 클라이언트와 서버를 설정해야 합니다.
 
 ## 이후 확장 목표
 
-- **CUBRID SQL 포매팅:** 코드 정렬과 편집기 포매팅 동작을 연결합니다. 첫 언어 도구 배포 범위에는 포함되지 않습니다.
+- **CUBRID SQL 포매팅:** 코드 정렬과 편집기 포매팅 동작을 연결합니다. 포매팅은 아직 구현되지 않았습니다.
 - **구문 강조 개선:** 초기 Vim syntax·TextMate 규칙 이후 Tree-sitter 도입을 검토합니다.
 - **더 넓은 완성·검사:** CTE·파생 결과, PL/CSQL, 의미·스타일 린트, 편집기 실시간 카탈로그를 검토합니다.
 - **추가 환경:** 다른 CUBRID 빌드·버전과 운영체제는 환경별 검증 이후 확대합니다.
 
-배포 날짜를 확정한 약속은 아닙니다. 상세 인터페이스와 구현 순서는
-[공통 엔진 프로젝트](https://github.com/vimkim/cubrid-language-tools)에 기록되어 있습니다.
+배포 날짜를 확정한 약속은 아닙니다. 현재 우선순위는
+[공통 엔진 로드맵](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/product-roadmap.md)을 참고하세요.

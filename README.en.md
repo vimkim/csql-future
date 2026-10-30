@@ -181,24 +181,26 @@ Current schema completion excludes CTEs, derived-table columns, correlated outer
 aliases, synonyms, and SQL held only in CSQL's internal command buffer.
 Interactive support is Linux-first. See the [usage guide](docs/usage.en.md) for details and limits.
 
-## Next: bring the same completion engine to editors
+## Shared language tools and editor support
 
-The separate [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project
-is building the shared engine for future terminal and editor integration.
-The following features are **planned**.
+The shared language tools and editor clients now exist in separate repositories.
 
-| Stage | Goal |
+| Project | Current role |
 | --- | --- |
-| Shared completion engine + **LSP** | One language server sharing completion logic with the terminal |
-| **Offline syntax checks / linting** | Report syntax errors through the CUBRID parser without executing SQL |
-| **VS Code extension** | Completion, syntax diagnostics, highlighting, and basic indentation |
-| **Neovim support** | Completion and diagnostics through the same LSP, plus highlighting |
-| Later: **formatting** and more | A CUBRID SQL formatter, editor formatting integration, and Tree-sitter evaluation |
+| [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) | Shared completion core, `cubrid-lint` offline syntax checks, and `cubrid-language-server` |
+| [cubrid-vscode](https://github.com/vimkim/cubrid-vscode) | VS Code client for shared LSP completion and diagnostics, plus highlighting and basic indentation |
+| [cubrid.nvim](https://github.com/vimkim/cubrid.nvim) | Neovim client for the same LSP, plus highlighting and basic indentation |
 
-The first language-tool delivery starts with qualification of one CUBRID 11.5 build.
-Formatting and semantic/style lint remain later goals. You can already use
-Ctrl+X Ctrl+E with Neovim or another external editor. LSP integration is a separate planned feature.
-See the [roadmap](docs/roadmap.en.md) and [shared engine project](https://github.com/vimkim/cubrid-language-tools).
+`csql-future` still uses its own completion engine. Migration to the shared core
+remains planned. Installing this terminal package installs neither the lint CLI
+nor the language server or editor clients. Ctrl+X Ctrl+E continues to open your
+chosen external editor.
+
+Strict syntax checks require a separately configured qualified native worker.
+See the core project's [installation guide](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/install.en.md)
+and [current coverage](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/coverage.en.md).
+Completion suggestions do not establish native syntax support.
+Formatting and semantic/style lint remain future work. See the [roadmap](docs/roadmap.en.md).
 
 ## Try it with one query you use today
 

@@ -252,5 +252,8 @@ SA에서 이렇게 하는 이유는 대화형 CSQL이 DB를 소유하는 동안 
 완성 계산·문맥 규칙·메타데이터 조회가 별도 파일로 나뉘어 있습니다.
 
 이 설명의 완성 예제와 관련 단위 테스트 44개를 확인했습니다.
-공통 언어 엔진·LSP·린트·편집기 확장은 별도 `cubrid-language-tools`의 계획이며,
-위 구조는 현재 터미널 프로그램의 동작입니다. 자세한 범위는 [로드맵](roadmap.md)을 참고하세요.
+공통 코어·린트 CLI·LSP는 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에 구현되어 있습니다.
+별도 VS Code·Neovim 클라이언트는 이 LSP를 사용합니다.
+이 터미널은 여전히 자체 [완성 모듈](../src/csql_future/completion.py)을 불러옵니다.
+공통 코어로의 전환은 후속 작업입니다. 메뉴·히스토리·PTY·SQL 실행은 터미널이 담당합니다.
+제품별 역할은 [로드맵](roadmap.md)을 참고하세요.

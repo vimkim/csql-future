@@ -252,5 +252,8 @@ The file layout does not map each responsibility to a separate file.
 Completion calculation, context rules, and metadata loading use separate files.
 
 The completion examples and 44 related unit tests passed against the implementation described here.
-The shared language engine, LSP, linting, and editor extensions belong to the separate `cubrid-language-tools` plan.
-The architecture above describes the current terminal program. See the [roadmap](roadmap.en.md) for scope.
+The shared core, lint CLI, and LSP exist in [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools).
+The separate VS Code and Neovim clients use that LSP.
+This terminal still imports its own [completion module](../src/csql_future/completion.py).
+Migration to the shared core remains planned. The terminal owns its menus, history,
+PTY, and SQL execution. See the [roadmap](roadmap.en.md) for product boundaries.

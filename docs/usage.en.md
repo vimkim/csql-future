@@ -19,6 +19,11 @@ It ignores case and term order, including across newlines. This is a
 fuzzy-search-style workflow, without typo correction or skipped characters within a term.
 See the [internal introduction](internal-introduction.en.md) and [roadmap](roadmap.en.md).
 
+This terminal uses its own completion engine. The shared core, offline lint CLI,
+LSP, and editor clients are separate products. They are not installed by this package.
+Migration to the shared core remains planned. The [roadmap](roadmap.en.md)
+links their current installation and coverage guides.
+
 ## Runtime and installation
 
 The launcher supports Python 3.10 or newer. Python 3.11 and newer use only

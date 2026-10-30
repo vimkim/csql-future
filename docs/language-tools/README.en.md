@@ -4,6 +4,19 @@
 
 > Historical planning archive: the independent [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) project supersedes this original monorepo plan. These are preserved records, not the current implementation dispatch instructions.
 
+## Current products
+
+The shared completion core, `cubrid-lint`, and `cubrid-language-server` now exist
+in the independent project. The separate [VS Code](https://github.com/vimkim/cubrid-vscode)
+and [Neovim](https://github.com/vimkim/cubrid.nvim) clients use that LSP.
+`csql-future` still uses its own completion engine. Its migration remains planned.
+Use the core project's [installation guide](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/install.en.md)
+and [current coverage](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/coverage.en.md),
+and the terminal [roadmap](../roadmap.en.md) for current product boundaries.
+The planning status, code references, checkpoints, and experiments below retain their original scope.
+
+## Original planning record, 2026-10-28
+
 Status: planning deliverables, 2026-10-28. The editor tools and lint commands described here do not exist yet.
 
 Start with the [specification](spec.en.md), [contracts](contracts.en.md), and [ticket graph](tickets/README.en.md).

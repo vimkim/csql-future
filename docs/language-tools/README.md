@@ -4,6 +4,18 @@
 
 > 초기 계획 보존 기록: 독립 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) 프로젝트가 기존 단일 저장소 계획을 대체합니다. 아래는 당시 기록이며 현재 구현 작업의 할당 지침이 아닙니다.
 
+## 현재 제품
+
+공통 완성 코어·`cubrid-lint`·`cubrid-language-server`는 독립 프로젝트에 구현되어 있습니다.
+별도 [VS Code](https://github.com/vimkim/cubrid-vscode)·[Neovim](https://github.com/vimkim/cubrid.nvim)
+클라이언트는 이 LSP를 사용합니다. `csql-future`는 여전히 자체 완성 엔진을 사용하며 전환은 후속 작업입니다.
+현재 안내는 코어 프로젝트의 [설치 가이드](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/install.md)와
+[지원 범위](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/coverage.md),
+제품별 역할은 터미널 [로드맵](../roadmap.md)을 확인하세요.
+아래의 계획 상태·코드 참조·체크포인트·실험은 당시 범위를 보존합니다.
+
+## 2026-10-28 계획 원문
+
 상태: 2026-10-28에 작성한 계획 산출물입니다. 여기 설명하는 편집기 도구와 린트 명령은 계획 기준 시점에 구현되지 않았습니다.
 사용자에게 소개할 현재 기능과 확장 방향은 [로드맵](../roadmap.md)에서 확인하세요.
 

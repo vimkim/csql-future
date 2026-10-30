@@ -13,7 +13,7 @@ Commands, options, diagnostic codes, and SQL examples remain consistent across l
 | [Project introduction](../README.en.md) | Ctrl+R history search, CUBRID completion, installation |
 | [Usage guide](usage.en.md) | Keys, history, SHOW/session/hint/schema completion, limits, verification |
 | [Internal introduction and demo](internal-introduction.en.md) | Shareable introduction and short demo sequence |
-| [Roadmap](roadmap.en.md) | Current features and planned LSP/editor/formatting support |
+| [Roadmap](roadmap.en.md) | Current terminal features, separate language tools and editor clients, remaining integration work |
 
 ## Implementation and design
 
@@ -25,4 +25,6 @@ Commands, options, diagnostic codes, and SQL examples remain consistent across l
 | [README visuals](../assets/readme/README.en.md) | Capture provenance and regeneration |
 
 Design and experiment records preserve their original status and qualification limits.
-Check the [current features and roadmap](roadmap.en.md) before treating a proposed tool as available to install.
+The shared core, CLI, LSP, and editor clients now exist in separate repositories.
+The terminal still uses its own completion engine. See the [current features and roadmap](roadmap.en.md)
+for product boundaries and links to current installation and coverage guides.

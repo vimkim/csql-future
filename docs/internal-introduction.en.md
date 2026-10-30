@@ -36,10 +36,13 @@ Replace `mydb` with your database name. Use your existing CSQL options, includin
 `-S` for standalone or `-C` for client/server mode when needed.
 Submit one familiar query, then find it again with Ctrl+R.
 
-The plan is to use the separate `cubrid-language-tools` shared engine to extend
-this experience through **LSP, a VS Code extension, and Neovim support**. Offline syntax checks and **syntax highlighting** come next,
-with **CUBRID SQL formatting and editor formatting integration** as later goals.
-These editor and language tools are roadmap items, separate from current installed features.
+The separate [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)
+project provides a shared completion core, offline syntax-check CLI, and LSP.
+[VS Code](https://github.com/vimkim/cubrid-vscode) and
+[Neovim](https://github.com/vimkim/cubrid.nvim) clients use that LSP and provide highlighting.
+The terminal still uses its own completion engine. Migration to the shared core,
+CUBRID SQL formatting, and semantic/style lint remain future work.
+The terminal installation does not install the shared tools or editor clients.
 
 [Project and installation](../README.en.md) · [Usage](usage.en.md) ·
 [Roadmap](roadmap.en.md) · [Issues and suggestions](https://github.com/vimkim/csql-future/issues)
@@ -64,14 +67,16 @@ the example columns with real names. Suggestions depend on metadata visible to y
 Enter accepts a completion candidate. Press Enter after the menu closes to submit
 the draft. After showing hint completion, finish the comment and SQL or clear
 the draft with Ctrl+C. Ctrl+X Ctrl+E already supports an external editor.
-Planned Neovim LSP support is a separate feature.
+Configure the separate Neovim plugin and language server to use LSP features in that editor.
 
-## Distinguish current features from plans
+## Distinguish terminal features, separate products, and plans
 
 Current features are **history, Ctrl+R search, multiline editing, and
 SHOW/session/hint/schema completion**. Search requires every term as a substring
 and does not correct typos. Hint completion covers names. Enter parenthesized arguments yourself.
 
-LSP, offline syntax checks, VS Code, Neovim, and highlighting belong to the
-planned language-tool delivery. Formatting is a later goal. Do not present editor
-extensions as part of the current installation. Check the [roadmap](roadmap.en.md) when preparing a presentation.
+The shared CLI and LSP offer bounded offline checks with a qualified native worker.
+Their coverage and authoring warnings are separate from terminal completion.
+The VS Code and Neovim clients exist, but require their own installation and server configuration.
+See the [roadmap](roadmap.en.md) for product links and the authoritative installation and coverage guides.
+Formatting and semantic/style lint remain future work.

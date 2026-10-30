@@ -184,23 +184,25 @@ just sync
 동의어, CSQL 내부 명령 버퍼에만 남아 있는 SQL은 포함되지 않습니다.
 대화형 지원은 Linux를 우선합니다. 자세한 동작과 제약은 [사용 가이드](docs/usage.md)에 있습니다.
 
-## 앞으로: 터미널에서 익힌 완성을 편집기까지
+## 공통 언어 도구와 편집기 지원
 
-별도 프로젝트 [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools)에서
-공통 언어 엔진을 개발하고, csql-future와 편집기가 이를 사용하도록 확장할 계획입니다. 다음 항목은 **예정 기능**입니다.
+공통 언어 도구와 편집기 클라이언트는 별도 저장소에 구현되어 있습니다.
 
-| 단계 | 목표 |
+| 프로젝트 | 현재 역할 |
 | --- | --- |
-| 공통 완성 엔진 + **LSP** | 터미널과 편집기에서 완성 로직을 공유하는 언어 서버 |
-| **오프라인 문법 검사 / 린팅** | SQL을 실행하지 않고 CUBRID 파서로 문법 오류 위치 안내 |
-| **VS Code 확장** | 자동 완성, 문법 진단, 구문 강조, 기본 들여쓰기 |
-| **Neovim 지원** | 같은 LSP를 이용한 자동 완성·진단과 구문 강조 |
-| 후속 확장: **포매팅** 등 | CUBRID SQL 포매터와 편집기 포매팅 연동, Tree-sitter 검토 |
+| [cubrid-language-tools](https://github.com/vimkim/cubrid-language-tools) | 공통 완성 코어, 오프라인 문법 검사 `cubrid-lint`, `cubrid-language-server` |
+| [cubrid-vscode](https://github.com/vimkim/cubrid-vscode) | 공통 LSP의 완성·진단을 사용하는 VS Code 클라이언트, 구문 강조와 기본 들여쓰기 |
+| [cubrid.nvim](https://github.com/vimkim/cubrid.nvim) | 같은 LSP를 사용하는 Neovim 클라이언트, 구문 강조와 기본 들여쓰기 |
 
-첫 언어 도구 배포 계획은 CUBRID 11.5의 특정 빌드 검증부터 시작합니다.
-포매팅과 의미·스타일 린팅은 이후 확장 목표입니다.
-지금도 Ctrl+X Ctrl+E로 Neovim 등 외부 편집기를 열 수 있으며, LSP 연동은 별도 예정 기능입니다.
-[로드맵](docs/roadmap.md)과 [공통 엔진 프로젝트](https://github.com/vimkim/cubrid-language-tools)에서 범위를 확인하세요.
+`csql-future`는 여전히 자체 완성 엔진을 사용합니다. 공통 코어로의 전환은 후속 작업입니다.
+이 터미널 패키지를 설치해도 린트 CLI, 언어 서버, 편집기 클라이언트는 설치되지 않습니다.
+Ctrl+X Ctrl+E는 계속 지정한 외부 편집기를 엽니다.
+
+엄격한 문법 검사에는 별도로 설정한 검증된 네이티브 워커가 필요합니다.
+코어 프로젝트의 [설치 가이드](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/install.md)와
+[현재 지원 범위](https://github.com/vimkim/cubrid-language-tools/blob/main/docs/coverage.md)를 확인하세요.
+완성 후보는 네이티브 문법 지원을 보장하지 않습니다.
+포매팅과 의미·스타일 린트는 후속 목표입니다. [로드맵](docs/roadmap.md)을 참고하세요.
 
 ## 오늘 쓰는 쿼리 하나로 시작해 보세요
 
